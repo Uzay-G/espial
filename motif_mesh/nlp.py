@@ -4,7 +4,7 @@ import time
 
 import spacy
 import networkx
-from matplotlib import pyplot
+from matplotlib import pyplot as plt
 import treelib
 from nltk.wsd import lesk
 
@@ -21,22 +21,10 @@ class Freq:
 class ConceptMesh:
 
     def __init__(self):
-        self.concept_map = {}
-        self.documents = {}
         self.freq_cache = {}
-        self.total_concept_count = 0
         self.concept_graph = networkx.DiGraph()
         self.doc_graph = networkx.DiGraph()
-        pass
 
-    def __repr__(self):
-        l = "Documents\n"
-        for k, v in self.documents.items():
-            l += f"{k} - {v}\n"
-        l += "Concepts\n"
-        for k, v in self.concept_map.items():
-            l += f"{k} - {v}\n"
-        return l
 
     def add_concept(self, synset, item_id=None, depth=0, prev=None):
         already_cached = synset.name() in self.concept_graph # check if this concept was already encountered
@@ -45,7 +33,6 @@ class ConceptMesh:
             self.concept_graph.add_node(synset.name(), color="blue")
         if depth == 0:
             self.doc_graph.add_edge(item_id, synset.name())
-        curr_concept = self.concept_graph.nodes[synset.name()]
         if prev:
             self.concept_graph.add_edge(prev, synset.name()) # add child concept that spawned discovery of this one
         if already_cached:
@@ -141,47 +128,11 @@ class ConceptMesh:
 mesh = ConceptMesh()
 a = time.time()
 with archivy.app.app_context():
- #   id = 1586
-  #  text = archivy.data.get_item(id).content
-   # mesh.process_document(id, text).
- #   print(mesh)
     for item in archivy.data.get_items(structured=False):
-        mesh.process_document(item["id"], item.content)
-    #mesh.get_concept_frequencies()
+        if item["id"] < 30:
+            mesh.process_document(item["id"], item.content)
     b = time.time()
 
 print(b - a)
-
-#networkx.draw(mesh.concept_graph, with_labels=True)
-#networkx.draw(mesh.doc_graph)
-#pyplot.savefig("graph.png")
-"""
-max_sim = 0
-pair = [0, 0]
-for id1, d1 in mesh.documents.items():
-    for id2, d2 in mesh.documents.items():
-        if id1 != id2:
-            sim = mesh.compute_similarity(d1, d2)
-            if max_sim < sim:
-                max_sim = sim
-                pair = [id1, id2]
-tree = treelib.Tree()
-tree.create_node("root", "root")
-def temp_cr_tree(name, concept, parent):
-    try:
-        tree.create_node(name + ";" +  str(mesh.idf(name)), name, parent)
-    except:
-        pass
-    for c in concept.children:
-        temp_cr_tree(c, mesh.concept_map[c], name)
-
-
-
-
-for name, c in mesh.concept_map.items():
-    if not c.parents:
-        temp_cr_tree(name, c, "root")
-
-tree.show()
-"""
-#print(pair, max_sim)
+networkx.nx_agraph.write_dot(mesh.concept_graph, './concepts2.dot')
+networkx.nx_agraph.write_dot(mesh.doc_graph, './docs2.dot')

@@ -1,12 +1,14 @@
 import math
 import string
 import time
+import json
 
 import spacy
 import networkx
 from matplotlib import pyplot as plt
 import treelib
 from nltk.wsd import lesk
+import flask
 
 import archivy
 
@@ -36,22 +38,26 @@ class ConceptMesh:
         if prev:
             self.concept_graph.add_edge(prev, synset.name()) # add child concept that spawned discovery of this one
         if already_cached:
-            root_concepts = list(self.doc_graph.out_edges(synset.name(), data="depth"))
-            return [(concept[1], concept[2]) for concept in root_concepts] # return all root_parents of current concpet
+            #root_concepts = list(self.doc_graph.out_edges(synset.name(), data="depth"))
+            #return [(concept[1], concept[2]) for concept in root_concepts] # return all root_parents of current concpet
+            return
 
         if not hyps:
-            return [(synset.name(), depth)] # if no parent concepts, return current root concept
+            #return [(synset.name(), depth)] # if no parent concepts, return current root concept
+            return
 
         all_roots = []
         for hyp in hyps:
-            curr_roots = self.add_concept(hyp, item_id, depth + 1, prev=synset.name()) # iterate over overarching concepts
-            for root in curr_roots:
-                curr_depth = root[1] - depth
-                existing_depth = self.doc_graph.get_edge_data(synset.name(), root[0])
-                if existing_depth and existing_depth["depth"] > curr_depth:
-                    self.doc_graph.add_edge(synset.name(), root[0], depth=curr_depth)
-            all_roots += curr_roots
-        return all_roots
+            #curr_roots = self.add_concept(hyp, item_id, depth + 1, prev=synset.name()) # iterate over overarching concepts
+            self.add_concept(hyp, item_id, depth + 1, prev=synset.name())
+           # for root in curr_roots:
+            #    curr_depth = root[1] - depth
+             #   existing_depth = self.doc_graph.get_edge_data(synset.name(), root[0])
+              #  if existing_depth and existing_depth["depth"] > curr_depth:
+               #     self.doc_graph.add_edge(synset.name(), root[0], depth=curr_depth)
+           # all_roots += curr_roots
+       # return all_roots
+        return
 
     def get_hypernyms(self, chunk, item_id):
         sent = chunk.sent.text.strip() # get current sentennce of chunk
@@ -62,16 +68,29 @@ class ConceptMesh:
             return
         else:
             for w in chunk:
-                if w.pos_ in ["NOUN", "ADJ"]: # otherwise process only relevant words
+              #  if w.pos_ in ["NOUN", "ADJ"]: # otherwise process only relevant words
+
+                if w.pos_ in ["NOUN"]: # otherwise process only relevant words
                     ss = lesk(sent, w.text.translate(str.maketrans('', '', string.punctuation))) 
                     if ss:
                         self.add_concept(ss, item_id)
 
+    def trim(self):
+        for node in list(self.concept_graph):
+            if not node in self.doc_graph or len(self.doc_graph.in_edges(node)) <= 2:
+                self.concept_graph.remove_node(node)
+                if node in self.doc_graph:
+                    self.doc_graph.remove_node(node)
+
+
     def process_document(self, item_id, text):
         doc = nlp(text)
-        self.doc_graph.add_node(item_id, doc_nlp=doc)
+        self.doc_graph.add_node(item_id) # doc_nlp=doc)
         for chunk in doc.noun_chunks:
             self.get_hypernyms(chunk, item_id)
+
+    def compose(self):
+        return networkx.compose(self.doc_graph, self.concept_graph)
 
     """
     def count_freq(self, concept, name):
@@ -129,10 +148,13 @@ mesh = ConceptMesh()
 a = time.time()
 with archivy.app.app_context():
     for item in archivy.data.get_items(structured=False):
-        if item["id"] < 30:
-            mesh.process_document(item["id"], item.content)
+        mesh.process_document(item["id"], item.content)
     b = time.time()
 
 print(b - a)
-networkx.nx_agraph.write_dot(mesh.concept_graph, './concepts2.dot')
-networkx.nx_agraph.write_dot(mesh.doc_graph, './docs2.dot')
+mesh.trim()
+c = time.time()
+print(c - b)
+networkx.nx_agraph.write_dot(mesh.compose(), './compose.dot')
+#networkx.nx_agraph.write_dot(mesh.concept_graph, './concepts2.dot')
+#networkx.nx_agraph.write_dot(mesh.doc_graph, './docs2.dot')

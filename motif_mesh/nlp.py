@@ -1,37 +1,52 @@
 import math
+import copy
+import warnings
 import string
 import time
 import json
 
 import spacy
+import numpy as np
 import networkx
 from nltk.wsd import lesk
 
 import archivy
-
+np.seterr(all='raise')
 nlp = spacy.load("en_core_web_md")
 
 # idea: compute concept average vector to avoid highly abstract concepts slip their way through
+
+def cos_sim(v1, v2):
+    try:
+        res = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+        #print(res)
+        return res
+    except FloatingPointError:
+        print(v1, v2)
+        print(np.dot(v1, v2), np.linalg.norm(v1), np.linalg.norm(v2))
+
 class Freq:
     def __init__(self):
         self.concept_freq = 0
         self.doc_freq = set()
         self.cached = False
 
+spacy_cache = {}
 class ConceptMesh:
 
     def __init__(self):
         self.freq_cache = {}
         self.concept_graph = networkx.DiGraph()
         self.doc_graph = networkx.DiGraph()
+        self.cache = set()
 
 
     def add_concept(self, synset, item_id=None, depth=0, prev=None):
-        print(synset.name(), depth)
+        #print(synset.name(), depth)
         already_cached = synset.name() in self.concept_graph # check if this concept was already encountered
         hyps = synset.hypernyms()
         if not already_cached:
-            self.concept_graph.add_node(synset.name(), color="blue", sim=0)
+            self.concept_graph.add_node(synset.name(), color="blue", sim=0, avg_vec=0)
         if depth == 0:
             self.doc_graph.add_edge(item_id, synset.name())
         if prev and prev != synset.name():
@@ -60,7 +75,7 @@ class ConceptMesh:
 
     def get_hypernyms(self, chunk, item_id):
         sent = chunk.sent.text.strip().replace(" ", "_") # get current sentence of chunk
-        print(sent, chunk)
+        #print(sent, chunk)
         ss = lesk(sent, str(chunk)) # test to see if we can get a meaning for the entire chunk
         if ss:
             #print(chunk.text, ss.name())
@@ -83,26 +98,66 @@ class ConceptMesh:
                 #        self.add_concept(ss, item_id)
             
     def trim_node(self, concept):
+        if concept in self.cache:
+            return
         avg = 0
         n = 0
         linked_docs = list(self.doc_graph.in_edges(concept))
+        defined = 0
+        avg_vec = 0
         for link in linked_docs:
+            doc1 = link[0]
+            doc_vector = spacy_cache[doc1]
+            if defined:
+                avg_vec += doc_vector
+            else: 
+                avg_vec = doc_vector.copy()
+                defined = 1
             for link2 in linked_docs:
-                doc1 = link[0]
                 doc2 = link2[0]
                 if doc1 != doc2:
                     n += 1
                     avg += self.compute_similarity(doc1, doc2)
         avg = (n == 0) or avg / n
-        self.concept_graph.nodes[concept]["sim"] = avg
-        #print(avg)
-        for link in list(self.concept_graph.in_edges(concept)):
+        networkx.set_node_attributes(self.concept_graph, {concept: avg}, name="sim")
+        n = len(linked_docs)
+        child_concepts = self.concept_graph.in_edges(concept)
+        avg_child_sim = 0
+        saved_avg = (n == 0) or avg_vec / len(linked_docs)
+        for link in list(child_concepts):
             if link[0] in self.concept_graph:
                 self.trim_node(link[0])
+                if link[0] in self.concept_graph:
+                    n += 1
+                    other_avg_vec = self.concept_graph.nodes[link[0]]["avg_vec"]
+                    if len(linked_docs):
+                        avg_child_sim += cos_sim(saved_avg, other_avg_vec) 
+                    if defined:
+                        avg_vec += other_avg_vec
+                    else:
+                        avg_vec = other_avg_vec
+                        defined = 1
+        if len(linked_docs) and len(child_concepts):
+            avg_child_sim /= len(child_concepts)
+        else: avg_child_sim = 1
+        if n:
+            networkx.set_node_attributes(self.concept_graph, {concept: avg_vec / n}, name="avg_vec")
+        
+        n = 0
+        child_mutual_sim = 0
+        for link in child_concepts:
+            for link2 in child_concepts:
+                if link != link2:
+                    n += 1
+                    #if self.concept_graph.nodes[link[0]]["avg_vec"] != 0 and self.concept_graph.nodes[link2[0]]["avg_vec"] != 0:
+                    child_mutual_sim += cos_sim(self.concept_graph.nodes[link[0]]["avg_vec"], self.concept_graph.nodes[link2[0]]["avg_vec"])
+        child_mutual_sim = (n == 0) or child_mutual_sim / n
         total_in_edges = len(self.concept_graph.in_edges(concept))
         if len(linked_docs):
-            total_in_edges += len(self.doc_graph.in_edges(concept))
-        if avg < 0.9 or total_in_edges <= 2 or not ".n." in concept:
+            total_in_edges += len(linked_docs)
+        print(concept, child_mutual_sim, avg_child_sim, avg, total_in_edges)
+        self.cache.add(concept)
+        if avg < 0.8 or child_mutual_sim < 0.75 or avg_child_sim < 0.75 or total_in_edges <= 2 or not ".n." in concept:
             if len(linked_docs): self.doc_graph.remove_node(concept)
             self.concept_graph.remove_node(concept)
 
@@ -115,7 +170,10 @@ class ConceptMesh:
 
     def process_document(self, item_id, text):
         doc = nlp(text)
-        self.doc_graph.add_node(item_id, doc_nlp=doc)
+        self.doc_graph.add_node(item_id)
+        if item_id in spacy_cache:
+            print("REEE BITCH")
+        spacy_cache[item_id] = doc.vector.copy()
         for chunk in doc.noun_chunks:
             self.get_hypernyms(chunk, item_id)
 
@@ -155,7 +213,7 @@ class ConceptMesh:
     """
 
     def compute_similarity(self, doc1, doc2):
-        vector_sim = self.doc_graph.nodes[doc1]["doc_nlp"].similarity(self.doc_graph.nodes[doc2]["doc_nlp"])
+        vector_sim = cos_sim(spacy_cache[doc1], spacy_cache[doc2])
         return vector_sim
 
     """
@@ -178,24 +236,20 @@ mesh = ConceptMesh()
 a = time.time()
 with archivy.app.app_context():
     for item in archivy.data.get_items(structured=False):
-        if item["id"] < 10000:
-            mesh.process_document(item["id"], item.content)
+        mesh.process_document(item["id"], item.content)
     b = time.time()
 
 print(b - a)
-#mesh.trim_all()
+mesh.trim_all()
 c = time.time()
 print(c - b)
-#print(len(mesh.concept_graph))
-#for c in mesh.concept_graph:
-#    print(c, list(mesh.concept_graph.out_edges(c)), mesh.concept_graph.nodes[c]["sim"])
+print("len", len(mesh.concept_graph))
+for c in mesh.concept_graph:
+    print(c, list(mesh.concept_graph.out_edges(c)), mesh.concept_graph.nodes[c]["sim"])
     
-#composed_graph = mesh.compose()
-#for node in composed_graph:
-#    if "doc_nlp" in composed_graph.nodes[node]:
-#        composed_graph.nodes[node]["doc_nlp"] = 0
-#d = networkx.json_graph.node_link_data(composed_graph)
-#json.dump(d, open("force/force.json", "w"))
+composed_graph = mesh.compose()
+d = networkx.json_graph.node_link_data(composed_graph)
+json.dump(d, open("force/force.json", "w"))
 #networkx.nx_agraph.write_dot(mesh.compose(), './compose.dot')
 #networkx.nx_agraph.write_dot(mesh.concept_graph, './concepts2.dot')
 #networkx.nx_agraph.write_dot(mesh.doc_graph, './docs2.dot')

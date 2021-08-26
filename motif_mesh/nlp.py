@@ -37,6 +37,14 @@ class ConceptMesh:
 
     def add_concept(self, synset, item_id=None, depth=0, prev=None):
         #print(synset.name(), depth)
+        if synset.name().strip() == "":
+            return
+        if not synset.name() in spacy_cache:
+            spacy_cache[synset.name()] = nlp(synset.name().split(".")[0].replace("_", " "))
+        sim = spacy_cache[item_id].similarity(spacy_cache[synset.name()])
+        if depth == 0 and sim < 0.3 and spacy_cache[synset.name()].has_vector:
+            print(synset.name(), self.doc_graph.nodes[item_id]["title"], sim)
+            return
         already_cached = synset.name() in self.concept_graph # check if this concept was already encountered
         hyps = synset.hypernyms()
         if not already_cached:
@@ -101,11 +109,10 @@ class ConceptMesh:
         avg_vec = 0
         word_sim = 0
         nlp_conc = nlp(concept.split(".")[0].replace("_", " "))
-        print(nlp_conc.text)
         for link in linked_docs:
             doc1 = link[0]
             doc_vector = spacy_cache[doc1].vector
-            word_sim += spacy_cache[doc1].similarity(nlp_conc)
+            #word_sim += spacy_cache[doc1].similarity(nlp_conc)
             if defined:
                 avg_vec += doc_vector
             else: 
@@ -117,7 +124,7 @@ class ConceptMesh:
                     n += 1
                     avg += self.compute_similarity(doc1, doc2)
         avg = (n == 0) or avg / n
-        word_sim /= (len(linked_docs) == 0) or len(linked_docs)
+        #word_sim /= (len(linked_docs) == 0) or len(linked_docs)
         networkx.set_node_attributes(self.concept_graph, {concept: avg}, name="sim")
         n = len(linked_docs)
         child_concepts = self.concept_graph.in_edges(concept)
@@ -156,7 +163,7 @@ class ConceptMesh:
             total_in_edges += len(linked_docs)
         print(concept, child_mutual_sim, avg_child_sim, avg, len(linked_docs), len(child_concepts), word_sim)
         self.cache.add(concept)
-        if word_sim < 0.4 or child_mutual_sim < 0.85 or avg_child_sim < 0.85 or total_in_edges <= 5 or not ".n." in concept:
+        if child_mutual_sim < 0.85 or avg_child_sim < 0.85 or total_in_edges <= 3 or not ".n." in concept:
             if len(linked_docs): self.doc_graph.remove_node(concept)
             self.concept_graph.remove_node(concept)
 
@@ -246,6 +253,7 @@ for c in mesh.concept_graph:
     print(c, list(mesh.concept_graph.out_edges(c)), list(mesh.concept_graph.in_edges(c)), mesh.concept_graph.nodes[c]["sim"])
     
 composed_graph = mesh.compose()
+print(len(composed_graph) - len(mesh.concept_graph))
 i = 0
 for node in composed_graph:
     composed_graph.nodes[node]["avg_vec"] = 0

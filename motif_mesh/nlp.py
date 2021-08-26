@@ -156,7 +156,7 @@ class ConceptMesh:
             total_in_edges += len(linked_docs)
         print(concept, child_mutual_sim, avg_child_sim, avg, len(linked_docs), len(child_concepts), word_sim)
         self.cache.add(concept)
-        if word_sim < 0.5 or avg < 0.85 or child_mutual_sim < 0.9 or avg_child_sim < 0.9 or total_in_edges <= 2 or not ".n." in concept:
+        if word_sim < 0.4 or child_mutual_sim < 0.85 or avg_child_sim < 0.85 or total_in_edges <= 5 or not ".n." in concept:
             if len(linked_docs): self.doc_graph.remove_node(concept)
             self.concept_graph.remove_node(concept)
 
@@ -167,9 +167,9 @@ class ConceptMesh:
                 self.trim_node(node)
 
 
-    def process_document(self, item_id, text):
+    def process_document(self, item_id, text, title):
         doc = nlp(text)
-        self.doc_graph.add_node(item_id)
+        self.doc_graph.add_node(item_id, title=title)
         spacy_cache[item_id] = doc
         for chunk in doc.noun_chunks:
             self.get_hypernyms(chunk, item_id)
@@ -233,7 +233,7 @@ a = time.time()
 with archivy.app.app_context():
     for item in archivy.data.get_items(structured=False):
         if item["id"] < 10000:
-            mesh.process_document(item["id"], item.content)
+            mesh.process_document(item["id"], item.content, item["title"])
     b = time.time()
 
 print(b - a)
@@ -246,8 +246,11 @@ for c in mesh.concept_graph:
     print(c, list(mesh.concept_graph.out_edges(c)), list(mesh.concept_graph.in_edges(c)), mesh.concept_graph.nodes[c]["sim"])
     
 composed_graph = mesh.compose()
+i = 0
 for node in composed_graph:
     composed_graph.nodes[node]["avg_vec"] = 0
+    composed_graph.nodes[node]["i"] = i
+    i += 1
 d = networkx.json_graph.node_link_data(composed_graph)
 json.dump(d, open("force/force.json", "w"))
 #networkx.nx_agraph.write_dot(mesh.compose(), './compose.dot')

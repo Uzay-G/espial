@@ -6,12 +6,17 @@ import string
 import time
 import json
 
+import flask
+from bs4 import BeautifulSoup
+from flask_cors import CORS, cross_origin
+import html2text
 import spacy
 from spacy.tokens import DocBin, Doc
 import numpy as np
 import networkx
 from nltk.wsd import lesk
 from nltk.corpus import wordnet
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 import archivy
 nlp = spacy.load("en_core_web_md")
@@ -34,6 +39,7 @@ class ConceptMesh:
         self.doc_graph = networkx.DiGraph()
         self.cache = set()
         self.nb_docs = 0
+        self.query_results = {}
 
     def build_concept_tree(self):
         for node in list(self.concept_graph):
@@ -54,7 +60,10 @@ class ConceptMesh:
             self.get_higher_concepts(hyp, prev=synset.name())
 
     def create_link(self, item, concept):
+        if not ".n." in concept:
+            return
         if not concept in self.concept_graph:
+            spacy_cache[concept] = nlp(concept.split(".")[0].replace("_", " "))
             self.concept_graph.add_node(concept, sim=0, avg_vec=0, count=1)
         if self.doc_graph.has_edge(item, concept):
             self.doc_graph[item][concept]["count"] += 1
@@ -84,7 +93,7 @@ class ConceptMesh:
             tf = data["count"] / self.doc_graph.nodes[item]["tf"]
             idf = math.log(self.nb_docs / self.concept_graph.nodes[concept]["count"])
             #print(tf * idf, item, concept)
-            if tf * idf < 0.02:
+            if tf * idf < 0.04:
                 self.doc_graph.remove_edge(item, concept)
             
     def trim_node(self, concept):
@@ -96,11 +105,10 @@ class ConceptMesh:
         defined = 0
         avg_vec = 0
         word_sim = 0
-        nlp_conc = nlp(concept.split(".")[0].replace("_", " "))
         for link in linked_docs:
             doc1 = link[0]
             doc_vector = spacy_cache[doc1].vector
-            word_sim += spacy_cache[doc1].similarity(nlp_conc)
+            word_sim += spacy_cache[doc1].similarity(spacy_cache[concept])
             if defined:
                 avg_vec += doc_vector
             else: 
@@ -152,7 +160,7 @@ class ConceptMesh:
         #print(concept, child_mutual_sim, avg_child_sim, avg, len(linked_docs), len(child_concepts), word_sim)
         self.cache.add(concept)
         #if child_mutual_sim < 0.85 or avg < 0.8 avg_child_sim < 0.85 or total_in_edges <= 2 or not ".n." in concept:
-        if total_in_edges <= 3 or avg < 0.8 or child_mutual_sim < 0.8 or avg_child_sim < 0.8 or word_sim < 0.4: 
+        if total_in_edges <= 2 or avg < 0.8 or word_sim < 0.55 or child_mutual_sim < 0.8 or avg_child_sim < 0.8: 
             if concept in self.doc_graph: self.doc_graph.remove_node(concept)
             self.concept_graph.remove_node(concept)
 
@@ -169,7 +177,6 @@ class ConceptMesh:
         spacy_cache[doc._.id] = doc
         for chunk in doc.noun_chunks:
             self.get_hypernyms(chunk, doc._.id)
-            #print(time.time() - b, "time for one concept")
 
     def compose(self):
         return networkx.compose(self.doc_graph, self.concept_graph)
@@ -180,7 +187,7 @@ class ConceptMesh:
 
     def propagate_specific_root(self, root, current, depth):
         if "roots" in self.concept_graph.nodes[current]:
-            self.concept_graph.nodes[current].append((root, depth))
+            self.concept_graph.nodes[current]["roots"].append((root, depth))
         else:
             self.concept_graph.nodes[current]["roots"] = [(root, depth)]
         for i in self.concept_graph.in_edges(current):
@@ -198,7 +205,7 @@ class ConceptMesh:
         max_score = 0
         scores = []
         i = 0
-        docs = list(spacy_cache.values())
+        docs = [doc for name, doc in spacy_cache.items() if isinstance(name, int)]
         doc_roots = {}
         for d in self.doc_graph:
             doc_roots[d] = {}
@@ -207,6 +214,7 @@ class ConceptMesh:
                     doc_roots[d][c[0]] = c[1]
 
         for doc in docs:
+
             i += 1
             interlinked.add_node(doc._.id, title=doc._.title)
             for doc2 in docs[i:]:
@@ -224,34 +232,77 @@ class ConceptMesh:
         print(scores[:100])
         return interlinked
 
+    def search_for_synset(self, ss, depth=1):
+        if ss.name() in self.doc_graph:
+            print(ss.name())
+            for doc, _ in self.doc_graph.in_edges(ss.name()):
+                print(spacy_cache[doc]._.title)
+                self.query_results[doc] = self.query_results.get(doc, 0) + 1/depth
+            return
+        hyps = ss.hypernyms()
+        for hyp in hyps:
+            self.search_for_synset(hyp, depth + 1)
+
+
+    def search(self, query):
+        self.query_results = {}
+        doc = nlp(query)
+
+        nouns = set()
+        for chunk in doc.noun_chunks:
+            nouns.add(chunk.root.text)
+            sent = chunk.sent.text.strip().replace(" ", "_") # get current sentence of chunk
+            if len(sent.split(" ")) > 1:
+                ss = lesk(sent, str(chunk)) # test to see if we can get a meaning for the entire chunk
+                if ss:
+                    self.search_for_synset(ss)
+                else:
+                    ss = lesk(sent, chunk.root.text)
+                    if ss:
+                        self.search_for_synset(ss)
+            else:
+                for ss in wordnet.synsets(chunk.text):
+                    self.search_for_synset(ss)
+        for word in doc:
+            if not word.text in nouns and not word.is_stop:
+                for ss in wordnet.synsets(word.text):
+                    if ".n." in ss.name():
+                        self.search_for_synset(ss)
+        return [spacy_cache[key]._.title for key, _ in sorted(self.query_results.items(), key=lambda item: item[1], reverse=True)]
 
 mesh = ConceptMesh()
 a = time.time()
+docs = []
 if exists("serialized"):
     with open("serialized", "rb") as f:
         doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
         docs = list(doc_bin.get_docs(nlp.vocab))
-        for doc in docs:
-            mesh.process_document(doc)
-    print(time.time() - a)
 else:
     doc_bin = DocBin(store_user_data=True)
-docs = []
+unseen_docs = []
 with archivy.app.app_context():
     for item in archivy.data.get_items(structured=False):
         if not item["id"] in mesh.doc_graph:
-            print("b", item["id"])
-            docs.append((item.content, {"id": item["id"], "title": item["title"]}))
-
-for doc, ctx in nlp.pipe(docs, as_tuples=True, disable=["ner", "lemmatizer", "textcat"]):
+            unseen_docs.append((item.content, {"id": item["id"], "title": item["title"]}))
+for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["ner", "lemmatizer", "textcat"], batch_size=50):
     doc._.title = ctx["title"]
     doc._.id = ctx["id"]
-    mesh.process_document(doc)
     doc_bin.add(doc)
+    docs.append(doc)
+
+print(time.time() - a, f"time to scrape docs, of {len(unseen_docs)} new ones.")
+
+
+#tf_time = time.time()
+#tf_idf = TfidfVectorizer(strip_accents="unicode", stop_words="english", max_df=0.7) # better preprocessing here
+#tfidf_mat = tf_idf.fit_tranform(list(map(lambda doc: doc.text, docs)))
+#print(time.time() - tf_time, "tf_idf")
+if len(unseen_docs):
+    with open("serialized", "wb") as f:
+        f.write(doc_bin.to_bytes())
 
 
 b = time.time()
-print("indexing", b - a)
 print(mesh.doc_graph.number_of_edges())
 mesh.remove_irrelevant_edges()
 print(mesh.doc_graph.number_of_edges(), "number of edges after tf-idf")
@@ -267,18 +318,6 @@ print(time.time() - d, "time to trim")
 print(len(mesh.concept_graph), "number of concepts after trimming")
 print(mesh.doc_graph.number_of_edges(), "number of edges after trimming")
 
-"""
-
-print("len", len(mesh.concept_graph))
-for c in mesh.concept_graph:
-
-    print(c, list(mesh.concept_graph.out_edges(c)), list(mesh.concept_graph.in_edges(c)), mesh.concept_graph.nodes[c]["sim"])
-    
-#networkx.nx_agraph.write_dot(mesh.compose(), './compose.dot')
-#networkx.nx_agraph.write_dot(mesh.concept_graph, './concepts2.dot')
-#networkx.nx_agraph.write_dot(mesh.doc_graph, './docs2.dot')
-"""
-
 composed_graph = mesh.compose()
 print(mesh.nb_docs, "number of docs")
 i = 0
@@ -289,10 +328,35 @@ for node in composed_graph:
 d = networkx.json_graph.node_link_data(composed_graph)
 json.dump(d, open("force/force.json", "w"))
 
-t = time.time()
-d2 = networkx.json_graph.node_link_data(mesh.interlink_docs_graph())
-json.dump(d2, open("force/force2.json", "w"))
-print(time.time() - t, "similarity graph")
+#t = time.time()
+#d2 = networkx.json_graph.node_link_data(mesh.interlink_docs_graph())
+#json.dump(d2, open("force/force2.json", "w"))
+#print(time.time() - t, "similarity graph")
 
-#with open("serialized", "wb") as f:
-#    f.write(doc_bin.to_bytes())
+app = flask.Flask(__name__)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
+with open("serialized", "wb") as f:
+    f.write(doc_bin.to_bytes())
+
+
+@app.route("/search", methods=["POST"])
+@cross_origin()
+def search():
+    q = flask.request.json.get("q", None)
+    is_web = flask.request.json["html"]
+    if is_web:
+        soup = BeautifulSoup(is_web)
+        stripped = ["footer", "nav", "img"]
+        for tag in stripped:
+            for s in soup.select(tag):
+                s.extract()
+        q = html2text.html2text(str(soup), bodywidth=0)
+    print(q)
+    resp = flask.jsonify(mesh.search(q))
+    return resp
+
+@app.route("/<file>")
+def serve_file(file):
+    return flask.send_file(f"../force/{file}")
+app.run(port=5002)

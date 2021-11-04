@@ -93,7 +93,7 @@ class ConceptMesh:
             tf = data["count"] / self.doc_graph.nodes[item]["tf"]
             idf = math.log(self.nb_docs / self.concept_graph.nodes[concept]["count"])
             #print(tf * idf, item, concept)
-            if tf * idf < 0.04:
+            if tf * idf < 0.03:
                 self.doc_graph.remove_edge(item, concept)
             
     def trim_node(self, concept):
@@ -146,21 +146,21 @@ class ConceptMesh:
             networkx.set_node_attributes(self.concept_graph, {concept: avg_vec / n}, name="avg_vec")
         
         n = 0
-        child_mutual_sim = 0
-        for link in child_concepts:
-            for link2 in child_concepts:
-                if link != link2:
-                    n += 1
+        #child_mutual_sim = 0
+        #for link in child_concepts:
+         #   for link2 in child_concepts:
+          #      if link != link2:
+           #         n += 1
                     #if self.concept_graph.nodes[link[0]]["avg_vec"] != 0 and self.concept_graph.nodes[link2[0]]["avg_vec"] != 0:
-                    child_mutual_sim += cos_sim(self.concept_graph.nodes[link[0]]["avg_vec"], self.concept_graph.nodes[link2[0]]["avg_vec"])
-        child_mutual_sim = (n == 0) or child_mutual_sim / n
+            #        child_mutual_sim += cos_sim(self.concept_graph.nodes[link[0]]["avg_vec"], self.concept_graph.nodes[link2[0]]["avg_vec"])
+        #child_mutual_sim = (n == 0) or child_mutual_sim / n
         total_in_edges = len(self.concept_graph.in_edges(concept))
         if len(linked_docs):
             total_in_edges += len(linked_docs)
         #print(concept, child_mutual_sim, avg_child_sim, avg, len(linked_docs), len(child_concepts), word_sim)
         self.cache.add(concept)
         #if child_mutual_sim < 0.85 or avg < 0.8 avg_child_sim < 0.85 or total_in_edges <= 2 or not ".n." in concept:
-        if total_in_edges <= 2 or avg < 0.8 or word_sim < 0.55 or child_mutual_sim < 0.8 or avg_child_sim < 0.8: 
+        if total_in_edges <= 2 or avg < 0.8 or word_sim < 0.45  or avg_child_sim < 0.8: # or child_mutual_sim < 0.8
             if concept in self.doc_graph: self.doc_graph.remove_node(concept)
             self.concept_graph.remove_node(concept)
 
@@ -277,6 +277,7 @@ if exists("serialized"):
     with open("serialized", "rb") as f:
         doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
         docs = list(doc_bin.get_docs(nlp.vocab))
+        list(map(mesh.process_document, docs))
 else:
     doc_bin = DocBin(store_user_data=True)
 unseen_docs = []
@@ -284,11 +285,13 @@ with archivy.app.app_context():
     for item in archivy.data.get_items(structured=False):
         if not item["id"] in mesh.doc_graph:
             unseen_docs.append((item.content, {"id": item["id"], "title": item["title"]}))
+print(len(unseen_docs))
 for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["ner", "lemmatizer", "textcat"], batch_size=50):
     doc._.title = ctx["title"]
     doc._.id = ctx["id"]
     doc_bin.add(doc)
     docs.append(doc)
+    mesh.process_document(doc)
 
 print(time.time() - a, f"time to scrape docs, of {len(unseen_docs)} new ones.")
 

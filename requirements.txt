@@ -1,0 +1,5 @@
+spacy
+numpy
+flask
+click
+networkx

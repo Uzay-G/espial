@@ -9,20 +9,14 @@ import re
 from sys import argv
 from hashlib import sha256
 from pathlib import Path
-import frontmatter
 
 import flask
+import click
 from flask import request, jsonify
-from bs4 import BeautifulSoup
-from flask_cors import CORS, cross_origin
-import html2text
 import spacy
 from spacy.tokens import DocBin, Doc
 import numpy as np
 import networkx
-from nltk.wsd import lesk
-from nltk.corpus import wordnet
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 import archivy
 nlp = spacy.load("en_core_web_md")
@@ -39,10 +33,9 @@ def cos_sim(v1, v2):
 def sigmoid(z):
     return 1/(1 + np.exp(-z))
 
-spacy_cache = {}
 class ConceptMesh:
 
-    def __init__(self, mode):
+    def __init__(self, mode, spacy_cache):
         self.freq_cache = {}
         self.concepts = set()
         self.graph = networkx.DiGraph()
@@ -52,9 +45,10 @@ class ConceptMesh:
         self.query_results = {}
         self.max_score = -1
         self.dbg = ""
+        self.spacy_cache = spacy_cache
         if mode:
             self.avg_exp_o = 0.1 * mode
-            self.tf_exp_o = 0.1 * mode
+            self.tf_exp_o = 0.05 * mode
         else:
             self.avg_exp_o = 0
             self.tf_exp_o = 0
@@ -70,8 +64,8 @@ class ConceptMesh:
             if concept.root.is_stop or not concept.root.is_alpha :
                 return
         if len(text) < 4: return
-        if not text in spacy_cache:
-            spacy_cache[text] = concept
+        if not text in self.spacy_cache:
+            self.spacy_cache[text] = concept
             self.seen_concepts.add(text)
             self.graph.add_node(text, sim=0, score=0, count=1, is_ent=is_ent)
         if self.graph.has_edge(item, text):
@@ -103,7 +97,7 @@ class ConceptMesh:
         word_sim = 0
         for link in linked_docs:
             doc1 = link[0]
-            word_sim += spacy_cache[doc1].similarity(spacy_cache[concept])
+            word_sim += self.spacy_cache[doc1].similarity(self.spacy_cache[concept])
             for link2 in linked_docs:
                 doc2 = link2[0]
                 if doc1 != doc2:
@@ -133,7 +127,7 @@ class ConceptMesh:
             if is_ent:
                 self.dbg += "ENT"
             self.dbg += "y\n"
-            score = avg + sigmoid(total_in_edges - 3) + word_sim
+            score = avg + sigmoid(min(total_in_edges - 3, 5)) + word_sim * 0.5
             self.max_score = max(self.max_score, score)
             self.graph.nodes[concept]["score"] = avg + sigmoid(total_in_edges - 3) + word_sim
 
@@ -147,7 +141,7 @@ class ConceptMesh:
     def process_document(self, doc):
         self.nb_docs += 1
         self.graph.add_node(doc._.id, title=doc._.title, tf=0)
-        spacy_cache[doc._.id] = doc
+        self.spacy_cache[doc._.id] = doc
         for chunk in doc.noun_chunks:
             self.get_sanitized_concepts(chunk, doc._.id)
         for ent in doc.ents:
@@ -156,158 +150,176 @@ class ConceptMesh:
                 self.create_link(doc._.id, ent, is_ent=True)
 
     def compute_similarity(self, doc1, doc2):
-        return spacy_cache[doc1].similarity(spacy_cache[doc2])
+        return self.spacy_cache[doc1].similarity(self.spacy_cache[doc2])
 
     def remove_doc(self, id):
         for doc, concept in self.graph.out_edges(id):
             self.graph.nodes[concept]["count"] -= 1
         self.graph.remove_node(id)
 
-data_dir = Path(argv[1])
-items = {}
-for path in data_dir.rglob("*.md"):
-    item = frontmatter.load(str(path))
-    items[sha256(item.content.encode()).hexdigest()] = item
-
-rerun_heuristics = "--rerun" in argv
-mode = -("--explore" in argv)
-mesh = ConceptMesh(mode=mode)
-if exists("graph.json") and not rerun_heuristics:
-    mesh.graph = networkx.json_graph.node_link_graph(json.load(open("graph.json", "r")))
-    print("loading graphs")
-
-a = time.time()
-docs = []
-if exists("serialized_annot"):
-    with open("serialized_annot", "rb") as f:
-        doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
-        deleted_docs = False
-        docs = []
-        for doc in doc_bin.get_docs(nlp.vocab):
-            if doc._.id in items:
-                docs.append(doc)
-            else:
-                deleted_docs = True
-        if deleted_docs:
-            doc_bin = DocBin(store_user_data=True)
-            for doc in docs:
-                doc_bin.add(doc)
-        spacy_cache = {doc._.id: doc for doc in docs}
-else:
-    doc_bin = DocBin(store_user_data=True)
-unseen_docs = []
-for curr_hash, item in items.items():
-    STOPWORDS = [
-            'a', 'about', 'an', 'are', 'and', 'as', 'at', 'be', 'but', 'by', 'com',
-            'do', 'don\'t', 'for', 'from', 'has', 'have', 'he', 'his', 'i', 'i\'m',
-            'in', 'is', 'it', 'it\'s', 'just', 'like', 'me', 'my', 'not', 'of',
-            'on', 'or', 'so', 't', 'that', 'the', 'they', 'this', 'to', 'was',
-            'we', 'were', 'with', 'you', 'your',
-    ]
-    item.content = " ".join(filter(lambda x: not x in STOPWORDS, item.content.split()))
-    item.content = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", item.content)
-    if not curr_hash in spacy_cache:
-        unseen_docs.append((item.content, {"id": curr_hash, "title": item["title"]}))
-print(len(unseen_docs))
-i = 0
-for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=40):
-    i += 1
-    if i % 40 == 0: print(i)
-    doc._.title = ctx["title"]
-    doc._.id = ctx["id"]
-    doc_bin.add(doc)
-    if ctx["id"] in spacy_cache and ctx["id"] in mesh.graph:
-        mesh.remove_doc(ctx["id"])
-    mesh.process_document(doc)
-
-print(time.time() - a, f"time to scrape docs, of {len(unseen_docs)} new ones.")
-if len(unseen_docs):
-    with open("serialized_annot", "wb") as f:
-        f.write(doc_bin.to_bytes())
+@click.group()
+def motif_mesh():
+    """Build a second brain, with a sane amount of effort :)"""
+    pass
+@motif_mesh.command("run")
+@click.argument("data-dir", type=click.Path(exists=True))
+@click.option("--rerun", help="Regenerate existing concept graph", is_flag=True)
+@click.option("--openness", type=int, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
+def run(data_dir, rerun, openness):
+    data_dir = Path(data_dir)
+    items = {}
+    if openness: rerun = 1
+    for path in data_dir.rglob("*.md"):
+        item = {"content": path.open("r").read(), "title": path.parts[-1]}
+        items[sha256(item["content"].encode()).hexdigest()] = item
+    saved_graph = (data_dir / "graph.json")
+    spacy_cache = {}
+    a = time.time()
+    docs = []
+    dumped_annot = (data_dir / "serialized_annot")
+    if dumped_annot.exists():
+        with dumped_annot.open("rb") as f:
+            doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
+            deleted_docs = False
+            docs = []
+            for doc in doc_bin.get_docs(nlp.vocab):
+                if doc._.id in items:
+                    docs.append(doc)
+                else:
+                    deleted_docs = True
+            if deleted_docs:
+                doc_bin = DocBin(store_user_data=True)
+                for doc in docs:
+                    doc_bin.add(doc)
+            spacy_cache = {doc._.id: doc for doc in docs}
+    else:
+        doc_bin = DocBin(store_user_data=True)
 
 
-b = time.time()
-if len(unseen_docs) or rerun_heuristics:
-    if rerun_heuristics:
-        list(map(lambda x: mesh.process_document(x), docs))
-    print(mesh.graph.number_of_edges())
-    mesh.remove_irrelevant_edges()
-    print(mesh.graph.number_of_edges(), "number of edges after tf-idf")
-    print(len(mesh.seen_concepts), "number of concepts")
-    c = time.time()
-    print("removing edges", c - b)
-    mesh.trim_all()
-    print(time.time() - c, "time to trim")
-print(len(mesh.seen_concepts), "number of concepts post-processing")
-print(mesh.graph.number_of_edges(), "number of edges post-processing")
-json_graph = networkx.json_graph.node_link_data(mesh.graph)
-json.dump(json_graph, open("graph.json", "w"))
-json.dump(json_graph, open("force/force.json", "w"))
-print(mesh.seen_concepts)
+    mesh = ConceptMesh(openness, spacy_cache)
 
-app = flask.Flask(__name__)
-cors = CORS(app)
-app.config['CORS_HEADERS'] = 'Content-Type'
-with open("out.txt", "w") as f:
-    f.write(mesh.dbg)
-@app.route("/<file>")
-def serve_file(file):
-    return flask.send_file(f"../force/{file}")
+    if (data_dir / "graph.json").exists() and not rerun:
+        mesh.graph = networkx.json_graph.node_link_graph(json.load(saved_graph.open("r")))
+        print("loading graphs")
+    unseen_docs = []
+    for curr_hash, item in items.items():
+        STOPWORDS = [
+                'a', 'about', 'an', 'are', 'and', 'as', 'at', 'be', 'but', 'by', 'com',
+                'do', 'don\'t', 'for', 'from', 'has', 'have', 'he', 'his', 'i', 'i\'m',
+                'in', 'is', 'it', 'it\'s', 'just', 'like', 'me', 'my', 'not', 'of',
+                'on', 'or', 'so', 't', 'that', 'the', 'they', 'this', 'to', 'was',
+                'we', 'were', 'with', 'you', 'your',
+        ]
+        item["content"] = " ".join(filter(lambda x: not x in STOPWORDS, item["content"].split()))
+        item["content"] = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", item["content"])
+        if not curr_hash in spacy_cache:
+            unseen_docs.append((item["content"], {"id": curr_hash, "title": item["title"]}))
+    print(f"{len(unseen_docs)} new docs.")
+    i = 0
+    for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=40):
+        i += 1
+        if i % 40 == 0: print(f"{i} docs processed.")
+        doc._.title = ctx["title"]
+        doc._.id = ctx["id"]
+        doc_bin.add(doc)
+        if ctx["id"] in spacy_cache and ctx["id"] in mesh.graph:
+            mesh.remove_doc(ctx["id"])
+        mesh.process_document(doc)
 
-@app.route("/most_sim")
-def find_sim():
-    id = int(request.args.get("id"))
-    doc = spacy_cache[id]
-    results = []
-    t = time.time()
-    for doc2 in docs:
-        if doc2._.id != id:
-            results.append((doc2._.id, doc.similarity(doc2)))
-    print(time.time() - t)
-    results.sort(key=lambda x: x[1], reverse=True)
-    top = results[:10]
-    final_res = []
-    for id2, _ in top:
-        doc2 = spacy_cache[id2]
-        max_sent = ""
-        max_sim = -1
-        for sent in doc2.sents:
-            sim = doc.similarity(sent)
-            if max_sim < sim:
-                max_sim = sim
-                max_sent = sent.text
-        final_res.append((doc2._.title, max_sim, max_sent))
-    return jsonify(final_res)
+    print(time.time() - a, f"time spent to process docs, of {len(unseen_docs)} new ones.")
+    if len(unseen_docs):
+        with open("serialized_annot", "wb") as f:
+            f.write(doc_bin.to_bytes())
 
 
-@app.route("/best_tags")
-def most_relevant_tags():
-    concept_avgs = [(concept, mesh.graph.nodes[concept]["score"]) for concept in mesh.graph if "score" in mesh.graph.nodes[concept]]
-    concept_avgs.sort(key=lambda x: x[1], reverse=True)
-    top = concept_avgs[:20]
-    for i in range(20):
-        in_docs = list(map(lambda x: spacy_cache[x[0]]._.title, mesh.graph.in_edges(top[i][0])))
-        top[i] = (top[i][0], top[i][1], in_docs)
-    return jsonify(top)
+    b = time.time()
+    if len(unseen_docs) or rerun:
+        if rerun:
+            list(map(lambda x: mesh.process_document(x), docs))
+        print(f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization.")
+        mesh.remove_irrelevant_edges()
+        print(mesh.graph.number_of_edges(), "number of doc-concept links after tf-idf pre-processing")
+        if rerun:
+            print(len(mesh.seen_concepts), "number of concepts before relevance cleaning.")
+        c = time.time()
+        print("time spent to remove irrelevant edges", c - b)
+        mesh.trim_all()
+        print(time.time() - c, "time spent to remove all uninteresting concepts")
+    if rerun:
+        print(len(mesh.seen_concepts), "number of concepts post-processing")
+        print(mesh.seen_concepts)
+    print(mesh.graph.number_of_edges(), "number of edges left post-processing")
+    json_graph = networkx.json_graph.node_link_data(mesh.graph)
+    json.dump(json_graph, saved_graph.open("w"))
 
-@app.route("/view_tag/<tag>")
-def view_tag(tag):
-    if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
-        return
-    tag_node = mesh.graph.nodes[tag]
-    tag_inf = {
-        "score": f"{tag_node['score']}/{mesh.max_score}",
-        "docs": list(map(lambda x: spacy_cache[x[0]]._.title, mesh.graph.in_edges(tag)))
-    }
-    return jsonify(tag_inf)
+    app = flask.Flask(__name__)
+    print(app.root_path)
 
-@app.route("/view_doc/<id>")
-def view_doc(id):
-    if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
-        return
-    doc_info = {
-        "doc": spacy_cache[id]._.title,
-        "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id)))
-    }
-    return jsonify(doc_info)
-app.run(port=5002)
+    json.dump(json_graph, (Path(app.root_path) / "../force/force.json").open("w"))
+    with open("out.txt", "w") as f:
+        f.write(mesh.dbg)
+
+    @app.route("/<file>")
+    def serve_file(file):
+        return flask.send_file(f"../force/{file}")
+
+    @app.route("/most_sim")
+    def find_sim():
+        id = int(request.args.get("id"))
+        doc = spacy_cache[id]
+        results = []
+        t = time.time()
+        for doc2 in docs:
+            if doc2._.id != id:
+                results.append((doc2._.id, doc.similarity(doc2)))
+        print(time.time() - t)
+        results.sort(key=lambda x: x[1], reverse=True)
+        top = results[:10]
+        final_res = []
+        for id2, _ in top:
+            doc2 = spacy_cache[id2]
+            max_sent = ""
+            max_sim = -1
+            for sent in doc2.sents:
+                sim = doc.similarity(sent)
+                if max_sim < sim:
+                    max_sim = sim
+                    max_sent = sent.text
+            final_res.append((doc2._.title, max_sim, max_sent))
+        return jsonify(final_res)
+
+
+    @app.route("/best_tags")
+    def most_relevant_tags():
+        concept_avgs = [(concept, mesh.graph.nodes[concept]["score"]) for concept in mesh.graph if "score" in mesh.graph.nodes[concept]]
+        concept_avgs.sort(key=lambda x: x[1], reverse=True)
+        top = concept_avgs[:30]
+        for i in range(30):
+            in_docs = list(map(lambda x: spacy_cache[x[0]]._.title, mesh.graph.in_edges(top[i][0])))
+            top[i] = (top[i][0], top[i][1], in_docs)
+        return jsonify(top)
+
+    @app.route("/view_tag/<tag>")
+    def view_tag(tag):
+        if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
+            return
+        tag_node = mesh.graph.nodes[tag]
+        tag_inf = {
+            "score": f"{tag_node['score']}/{mesh.max_score}",
+            "docs": list(map(lambda x: spacy_cache[x[0]]._.title, mesh.graph.in_edges(tag)))
+        }
+        return jsonify(tag_inf)
+
+    @app.route("/view_doc/<id>")
+    def view_doc(id):
+        if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
+            return
+        doc_info = {
+            "doc": spacy_cache[id]._.title,
+            "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id)))
+        }
+        return jsonify(doc_info)
+    app.run(port=5002)
+
+if __name__ == "__main__":
+    motif_mesh()

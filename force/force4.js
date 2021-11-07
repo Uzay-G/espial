@@ -1,3 +1,14 @@
+
+  let handle_tag_click = function(d) {
+	  console.log(d.id)
+	  if (!d.title) {
+		window.open(`http://localhost:5002/view_tag/${d.id}`, '_blank')
+	  }
+	  else {
+		window.open(`http://localhost:5002/view_doc/${d.id}`, '_blank')
+	  }
+  }
+
 var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height");
@@ -28,7 +39,8 @@ var color = d3.scaleOrdinal(d3.schemeBlues)
       .attr("class", "nodes")
     .selectAll("g")
     .data(graph.nodes)
-    .enter().append("g").attr("class", "node")
+    .enter().append("g").attr("class", "node").on("click", d => handle_tag_click(d));
+  
     
   var circles = node.append("circle")
       .attr("r", 10)

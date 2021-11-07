@@ -1,0 +1,4 @@
+- sense2vec
+- tag embedding automatic
+- bilinking (similarity between docs)
+- fix biases towards generality

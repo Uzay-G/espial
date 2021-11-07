@@ -263,9 +263,10 @@ def run(data_dir, rerun, openness):
     def serve_file(file):
         return flask.send_file(f"../force/{file}")
 
-    @app.route("/most_sim")
-    def find_sim():
-        id = int(request.args.get("id"))
+    @app.route("/most_sim/<id>")
+    def find_sim(id):
+        if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
+            return
         doc = spacy_cache[id]
         results = []
         t = time.time()
@@ -316,7 +317,8 @@ def run(data_dir, rerun, openness):
             return
         doc_info = {
             "doc": spacy_cache[id]._.title,
-            "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id)))
+            "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id))),
+            "info": f"See most similar: https://localhost:5002/most_sim/{id}"
         }
         return jsonify(doc_info)
     app.run(port=5002)

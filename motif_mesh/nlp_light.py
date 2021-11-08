@@ -18,7 +18,6 @@ from spacy.tokens import DocBin, Doc
 import numpy as np
 import networkx
 
-import archivy
 nlp = spacy.load("en_core_web_md")
 
 Doc.set_extension("title", default=None)

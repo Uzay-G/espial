@@ -41,7 +41,6 @@ var color = d3.scaleOrdinal(d3.schemeBlues)
     .data(graph.nodes)
     .enter().append("g").attr("class", "node").on("click", d => handle_tag_click(d));
   
-    
   var circles = node.append("circle")
       .attr("r", 10)
 	  .style("fill", d => {
@@ -112,3 +111,5 @@ function dragended(d) {
   d.fx = null;
   d.fy = null;
 }
+
+

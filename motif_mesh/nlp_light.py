@@ -6,6 +6,7 @@ import string
 import time
 import json
 import re
+from copy import deepcopy
 from sys import argv
 from hashlib import sha256
 from pathlib import Path
@@ -37,17 +38,16 @@ class ConceptMesh:
     def __init__(self, mode, spacy_cache):
         self.freq_cache = {}
         self.concepts = set()
-        self.graph = networkx.DiGraph()
+        self.graph = networkx.DiGraph(openness=mode)
         self.seen_concepts = set()
         self.temp_cache = set()
         self.nb_docs = 0
         self.query_results = {}
         self.max_score = -1
-        self.dbg = ""
         self.spacy_cache = spacy_cache
         if mode:
-            self.avg_exp_o = 0.1 * mode
-            self.tf_exp_o = 0.05 * mode
+            self.avg_exp_o = 0.025 * mode
+            self.tf_exp_o = 0.0125 * mode
         else:
             self.avg_exp_o = 0
             self.tf_exp_o = 0
@@ -84,8 +84,11 @@ class ConceptMesh:
         for item, concept, data in list(self.graph.edges(data=True)):
             tf = data["count"] / self.graph.nodes[item]["tf"]
             idf = math.log(self.nb_docs / self.graph.nodes[concept]["count"])
-            if (tf * idf < 0.03 + self.tf_exp_o and not self.graph.nodes[concept]["is_ent"]) or (tf * idf < 0.025 and self.graph.nodes[concept]["is_ent"]):
+            tf_idf = tf * idf
+            if (tf_idf < 0.03 + self.tf_exp_o and not self.graph.nodes[concept]["is_ent"]) or (tf_idf < 0.025 and self.graph.nodes[concept]["is_ent"]):
                 self.graph.remove_edge(item, concept)
+            else:
+                self.graph[item][concept]["tf_idf"] = tf_idf
 
     def trim_concept(self, concept):
         if concept in self.temp_cache:
@@ -104,28 +107,16 @@ class ConceptMesh:
                     avg += self.compute_similarity(doc1, doc2)
         avg = (n == 0) or avg / n
         word_sim /= (len(linked_docs) == 0) or len(linked_docs)
-        #networkx.set_node_attributes(self.graph, {concept: avg}, name="sim")
         n = len(linked_docs)
         total_in_edges = len(linked_docs)
-        #print(concept, child_mutual_sim, avg_child_sim, avg, len(linked_docs), len(child_concepts), word_sim)
         self.temp_cache.add(concept)
-        #if child_mutual_sim < 0.85 or avg < 0.8 avg_child_sim < 0.85 or total_in_edges <= 2 or not ".n." in concept:
-        #if self.graph.nodes[concept]["is_ent"]:
-         #   print(concept, word_sim, avg, total_in_edges)
         ent_criteria = avg < 0.85 + self.avg_exp_o or word_sim < 0.4
         word_crit = avg < 0.8 + self.avg_exp_o or word_sim < 0.5 + self.avg_exp_o * 0.5
         is_ent = self.graph.nodes[concept]["is_ent"]
-        if total_in_edges > 1:
-            self.dbg += f"{avg} {word_sim} {concept} {total_in_edges}"
         if total_in_edges < 2 or (word_crit and not is_ent) or (ent_criteria and is_ent): # or child_mutual_sim < 0.8 or avg_child_sim < 0.8
-            if total_in_edges > 1:
-                self.dbg += "n\n"
             self.graph.remove_node(concept)
             self.seen_concepts.remove(concept)
         else:
-            if is_ent:
-                self.dbg += "ENT"
-            self.dbg += "y\n"
             score = avg + sigmoid(min(total_in_edges - 3, 5)) + word_sim * 0.5
             self.max_score = max(self.max_score, score)
             self.graph.nodes[concept]["score"] = avg + sigmoid(total_in_edges - 3) + word_sim
@@ -145,7 +136,6 @@ class ConceptMesh:
             self.get_sanitized_concepts(chunk, doc._.id)
         for ent in doc.ents:
             if not ent.label_ in ["ORDINAL", "DATE", "MONEY", "CARDINAL", "TIME", "PERCENT"] and len(ent.text) < 50:
-                self.dbg += f"ENT {ent.label_} {ent.text}\n" 
                 self.create_link(doc._.id, ent, is_ent=True)
 
     def compute_similarity(self, doc1, doc2):
@@ -163,11 +153,10 @@ def motif_mesh():
 @motif_mesh.command("run")
 @click.argument("data-dir", type=click.Path(exists=True))
 @click.option("--rerun", help="Regenerate existing concept graph", is_flag=True)
-@click.option("--openness", type=int, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
+@click.option("--openness", type=float, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
 def run(data_dir, rerun, openness):
     data_dir = Path(data_dir)
     items = {}
-    if openness: rerun = 1
     for path in data_dir.rglob("*.md"):
         item = {"content": path.open("r").read(), "title": path.parts[-1]}
         items[sha256(item["content"].encode()).hexdigest()] = item
@@ -176,6 +165,7 @@ def run(data_dir, rerun, openness):
     a = time.time()
     docs = []
     dumped_annot = (data_dir / "serialized_annot")
+    openness = - openness
     if dumped_annot.exists():
         with dumped_annot.open("rb") as f:
             doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
@@ -197,9 +187,13 @@ def run(data_dir, rerun, openness):
 
     mesh = ConceptMesh(openness, spacy_cache)
 
-    if (data_dir / "graph.json").exists() and not rerun:
-        mesh.graph = networkx.json_graph.node_link_graph(json.load(saved_graph.open("r")))
-        print("loading graphs")
+    if saved_graph.exists() and not rerun:
+        loaded_graph = networkx.json_graph.node_link_graph(json.load(saved_graph.open("r")))
+        if openness != loaded_graph.graph["openness"]: rerun = 1
+        else: 
+            mesh.graph = loaded_graph
+            print("loading graphs")
+
     unseen_docs = []
     for curr_hash, item in items.items():
         STOPWORDS = [
@@ -227,7 +221,7 @@ def run(data_dir, rerun, openness):
 
     print(time.time() - a, f"time spent to process docs, of {len(unseen_docs)} new ones.")
     if len(unseen_docs):
-        with open("serialized_annot", "wb") as f:
+        with dumped_annot.open("wb") as f:
             f.write(doc_bin.to_bytes())
 
 
@@ -255,8 +249,6 @@ def run(data_dir, rerun, openness):
     print(app.root_path)
 
     json.dump(json_graph, (Path(app.root_path) / "../force/force.json").open("w"))
-    with open("out.txt", "w") as f:
-        f.write(mesh.dbg)
 
     @app.route("/<file>")
     def serve_file(file):
@@ -266,28 +258,17 @@ def run(data_dir, rerun, openness):
     def find_sim(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
             return
+        top_n = request.args.get("top_n", 10)
         doc = spacy_cache[id]
         results = []
-        t = time.time()
+        in_edges = list(map(lambda x: x[1], mesh.graph.out_edges(id)))
         for doc2 in docs:
             if doc2._.id != id:
-                results.append((doc2._.id, doc.similarity(doc2)))
-        print(time.time() - t)
+                in_edges2 = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
+                inter = [conc for conc in in_edges if conc in in_edges2]
+                results.append((doc2._.title, doc.similarity(doc2), inter))
         results.sort(key=lambda x: x[1], reverse=True)
-        top = results[:10]
-        final_res = []
-        for id2, _ in top:
-            doc2 = spacy_cache[id2]
-            max_sent = ""
-            max_sim = -1
-            for sent in doc2.sents:
-                sim = doc.similarity(sent)
-                if max_sim < sim:
-                    max_sim = sim
-                    max_sent = sent.text
-            final_res.append((doc2._.title, max_sim, max_sent))
-        return jsonify(final_res)
-
+        return jsonify(results[:min(top_n, len(results)-1)])
 
     @app.route("/best_tags")
     def most_relevant_tags():
@@ -317,7 +298,7 @@ def run(data_dir, rerun, openness):
         doc_info = {
             "doc": spacy_cache[id]._.title,
             "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id))),
-            "info": f"See most similar: https://localhost:5002/most_sim/{id}"
+            "info": f"See most similar: http://localhost:5002/most_sim/{id}"
         }
         return jsonify(doc_info)
     app.run(port=5002)

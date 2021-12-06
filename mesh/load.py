@@ -7,7 +7,7 @@ import networkx
 import re
 import spacy
 
-def load_mesh(data_dir, rerun, openness, data):
+def load_mesh(data_dir, rerun, openness):
     nlp = spacy.load("en_core_web_md")
     Doc.set_extension("title", default=None)
     Doc.set_extension("id", default=None)
@@ -41,7 +41,6 @@ def load_mesh(data_dir, rerun, openness, data):
 
 
     mesh = ConceptMesh(openness, doc_cache)
-    list(map(lambda x: mesh.process_document(x, index_concepts=rerun), docs))
     mesh.nb_docs = len(docs)
 
     unseen_docs = []
@@ -74,6 +73,8 @@ def load_mesh(data_dir, rerun, openness, data):
             print("loading graphs")
     else: rerun = 1
 
+    print(rerun)
+    list(map(lambda x: mesh.process_document(x, index_concepts=rerun), docs))
     print(f"{len(unseen_docs)} new docs.")
     i = 0
     for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=40):
@@ -92,4 +93,4 @@ def load_mesh(data_dir, rerun, openness, data):
         with dumped_annot.open("wb") as f:
             f.write(doc_bin.to_bytes())
     print(rerun)
-    return mesh, rerun
+    return mesh, nlp, rerun

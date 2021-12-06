@@ -22,7 +22,7 @@ def motif_mesh():
 @click.option("--openness", type=float, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
 def run(data_dir, rerun, openness):
     data_dir = Path(data_dir)
-    mesh, rerun = load_mesh(data_dir, rerun, -openness)
+    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness)
     b = time.time()
     if rerun:
         print(f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization.")
@@ -94,6 +94,13 @@ def run(data_dir, rerun, openness):
                 f.write(contents)
         readable_paths = list(map(lambda x: x.parts[-1], doc_paths))
         return jsonify({"paths": readable_paths})
+
+    @app.route("/search")
+    def search():
+        q = request.args.get("q")
+        if not q:
+            return
+        return jsonify(search_q(mesh, nlp(q)))
 
     app.run(port=5002)
 

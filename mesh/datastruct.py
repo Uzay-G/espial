@@ -20,7 +20,7 @@ class ConceptMesh:
 
         if mode:
             self.avg_exp_o = 0.025 * mode
-            self.tf_exp_o = 0.0125 * mode
+            self.tf_exp_o = 0
         else:
             self.avg_exp_o = 0
             self.tf_exp_o = 0
@@ -89,7 +89,7 @@ class ConceptMesh:
         else:
             score = avg + sigmoid(min(total_in_edges - 3, 5)) + word_sim * 0.5
             self.max_score = max(self.max_score, score)
-            self.graph.nodes[concept]["score"] = avg + sigmoid(total_in_edges - 3) + word_sim
+            self.graph.nodes[concept]["score"] = avg*(sigmoid(total_in_edges - 3) + word_sim)
 
     def trim_all(self):
         for concept in list(self.concept_cache.keys()):

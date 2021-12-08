@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import flask
+from flask_cors import CORS
 import networkx
 import click
 from flask import request, jsonify
@@ -11,7 +12,10 @@ from mesh.load import load_mesh
 from mesh.analysis import *
 
 
+def get_archivy_id(item):
+    return item["path"].split('/')[-1].split('-')[0]
 @click.group()
+
 def motif_mesh():
     """Build a second brain, with a sane amount of effort :)"""
     pass
@@ -22,7 +26,7 @@ def motif_mesh():
 @click.option("--openness", type=float, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
 def run(data_dir, rerun, openness):
     data_dir = Path(data_dir)
-    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness)
+    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness, get_archivy_id)
     b = time.time()
     if rerun:
         print(f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization.")
@@ -32,15 +36,15 @@ def run(data_dir, rerun, openness):
         z = time.time()
         print(time.time() - z, "merges")
         c = time.time()
-        print("time spent to remove irrelevant edges", c - b)
+        print(f"time spent to remove irrelevant edges: edges [{mesh.graph.number_of_edges()}]", c - b)
         mesh.trim_all()
         print(time.time() - c, "time spent to remove all uninteresting concepts")
     print(len(mesh.concept_cache), "number of concepts found")
     print(mesh.graph.number_of_edges(), "number of edges left")
     json_graph = networkx.json_graph.node_link_data(mesh.graph)
     json.dump(json_graph, (data_dir / "graph.json").open("w"))
-
     app = flask.Flask(__name__)
+    CORS(app)
     json.dump(json_graph, (Path(app.root_path) / "../force/force.json").open("w"))
 
     @app.route("/<file>")
@@ -102,6 +106,8 @@ def run(data_dir, rerun, openness):
             return
         return jsonify(search_q(mesh, nlp(q)))
 
+    with open("dbg_pain", "w") as f:
+        f.write(mesh.dbg)
     app.run(port=5002)
 
 if __name__ == "__main__":

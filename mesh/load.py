@@ -6,16 +6,20 @@ from mesh.datastruct import ConceptMesh
 import networkx
 import re
 import spacy
+import sys
 
-def load_mesh(data_dir, rerun, openness):
+hash_fn = lambda item: sha256(item["content"].encode()).hexdigest()
+def load_mesh(data_dir, rerun, openness, get_id=hash_fn):
     nlp = spacy.load("en_core_web_md")
     Doc.set_extension("title", default=None)
     Doc.set_extension("id", default=None)
     Doc.set_extension("path", default=None)
+    Doc.set_extension("hash", default=None)
     items = {}
     for path in data_dir.rglob("*.md"):
         item = {"content": path.open("r").read(), "title": path.parts[-1], "path": str(path)}
-        items[sha256(item["content"].encode()).hexdigest()] = item
+        item["hash"] = hash_fn(item)
+        items[get_id(item)] = item
     saved_graph = (data_dir / "graph.json")
     doc_cache = {}
     a = time.time()
@@ -26,7 +30,8 @@ def load_mesh(data_dir, rerun, openness):
             doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
             deleted_docs = False
             for doc in doc_bin.get_docs(nlp.vocab):
-                if doc._.id in items:
+                doc._.id = str(doc._.id)
+                if doc._.id in items and doc._.hash == items[doc._.id]["hash"]:
                     docs.append(doc)
                 else:
                     deleted_docs = True
@@ -39,12 +44,11 @@ def load_mesh(data_dir, rerun, openness):
     else:
         doc_bin = DocBin(store_user_data=True)
 
-
     mesh = ConceptMesh(openness, doc_cache)
     mesh.nb_docs = len(docs)
 
     unseen_docs = []
-    for curr_hash, item in items.items():
+    for id, item in items.items():
         STOPWORDS = [
                 'a', 'about', 'an', 'are', 'and', 'as', 'at', 'be', 'but', 'by', 'com',
                 'do', 'don\'t', 'for', 'from', 'has', 'have', 'he', 'his', 'i', 'i\'m',
@@ -54,8 +58,8 @@ def load_mesh(data_dir, rerun, openness):
         ]
         item["content"] = " ".join(filter(lambda x: not x in STOPWORDS, item["content"].split()))
         item["content"] = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", item["content"])
-        if not curr_hash in doc_cache:
-            unseen_docs.append((item["content"], {"id": curr_hash, "title": item["title"], "path": item["path"]}))
+        if not id in doc_cache:
+            unseen_docs.append((item["content"], {"id": id, "title": item["title"], "path": item["path"], "hash": item["hash"]}))
     if unseen_docs:
         rerun = 1
 
@@ -63,17 +67,13 @@ def load_mesh(data_dir, rerun, openness):
         loaded_graph = networkx.json_graph.node_link_graph(json.load(saved_graph.open("r")))
         if openness != loaded_graph.graph["openness"]: rerun = 1
         else: 
-            print(len(mesh.concept_cache))
             for node in loaded_graph.nodes():
                 if loaded_graph.nodes[node]["type"] == "concept":
-                    print(node)
                     mesh.concept_cache[node] = None # don't load the NLP
-            print(len(mesh.concept_cache))
             mesh.graph = loaded_graph
             print("loading graphs")
     else: rerun = 1
 
-    print(rerun)
     list(map(lambda x: mesh.process_document(x, index_concepts=rerun), docs))
     print(f"{len(unseen_docs)} new docs.")
     i = 0
@@ -83,6 +83,7 @@ def load_mesh(data_dir, rerun, openness):
         doc._.title = ctx["title"]
         doc._.id = ctx["id"]
         doc._.path = ctx["path"]
+        doc._.hash = ctx["hash"]
         doc_bin.add(doc)
         if ctx["id"] in doc_cache and ctx["id"] in mesh.graph:
             mesh.remove_doc(ctx["id"])

@@ -9,7 +9,7 @@ import spacy
 import sys
 
 hash_fn = lambda item: sha256(item["content"].encode()).hexdigest()
-def load_mesh(data_dir, rerun, openness, get_id=hash_fn):
+def load_mesh(data_dir, rerun, openness, batch_size, get_id=hash_fn):
     nlp = spacy.load("en_core_web_md")
     Doc.set_extension("title", default=None)
     Doc.set_extension("id", default=None)
@@ -58,7 +58,7 @@ def load_mesh(data_dir, rerun, openness, get_id=hash_fn):
         ]
         item["content"] = " ".join(filter(lambda x: not x in STOPWORDS, item["content"].split()))
         item["content"] = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", item["content"])
-        if not id in doc_cache:
+        if not id in doc_cache and len(item["content"]) < 1000000/10:
             unseen_docs.append((item["content"], {"id": id, "title": item["title"], "path": item["path"], "hash": item["hash"]}))
     if unseen_docs:
         rerun = 1
@@ -77,9 +77,9 @@ def load_mesh(data_dir, rerun, openness, get_id=hash_fn):
     list(map(lambda x: mesh.process_document(x, index_concepts=rerun), docs))
     print(f"{len(unseen_docs)} new docs.")
     i = 0
-    for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=40):
+    for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=batch_size):
         i += 1
-        if i % 40 == 0: print(f"{i} docs processed.")
+        if i % batch_size == 0: print(f"{i} docs processed.")
         doc._.title = ctx["title"]
         doc._.id = ctx["id"]
         doc._.path = ctx["path"]

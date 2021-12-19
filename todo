@@ -1,7 +1,0 @@
-- sense2vec
-- tag embedding automatic
-- bilinking (similarity between docs)
-- fix biases towards generality
-- fix zoom force graph (nodes cut off)
-- extension mechanisms (add ways to morph with knowledge base)
-- archivy plugin

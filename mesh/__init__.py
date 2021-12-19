@@ -10,7 +10,7 @@ import click
 from flask import request, jsonify
 from mesh.load import load_mesh
 from mesh.analysis import *
-
+import archivy
 
 def get_archivy_id(item):
     return item["path"].split('/')[-1].split('-')[0]
@@ -24,9 +24,10 @@ def motif_mesh():
 @click.argument("data-dir", type=click.Path(exists=True))
 @click.option("--rerun", help="Regenerate existing concept graph", is_flag=True)
 @click.option("--openness", type=float, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
-def run(data_dir, rerun, openness):
+@click.option("--batch-size", type=int, help="Processes documents by batches. If running on large documents, you may want to reduce batch size so as not to overload memory.", default=40)
+def run(data_dir, rerun, openness, batch_size):
     data_dir = Path(data_dir)
-    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness, get_archivy_id)
+    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness, batch_size, get_archivy_id)
     b = time.time()
     if rerun:
         print(f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization.")
@@ -102,9 +103,19 @@ def run(data_dir, rerun, openness):
     @app.route("/search")
     def search():
         q = request.args.get("q")
+        top_n = int(request.args.get("top_n", 10))
         if not q:
             return
-        return jsonify(search_q(mesh, nlp(q)))
+        return jsonify(search_q(mesh, nlp(q), top_n))
+
+    @app.route("/article_search")
+    def compare_article():
+        url = request.args.get("url")
+        top_n = int(request.args.get("top_n", 10))
+        with archivy.app.app_context():
+            d = archivy.models.DataObj(type="bookmark", url=url)
+            d.process_bookmark_url()
+        return jsonify(search_q(mesh, nlp(d.content), top_n))
 
     with open("dbg_pain", "w") as f:
         f.write(mesh.dbg)

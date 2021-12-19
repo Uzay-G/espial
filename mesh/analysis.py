@@ -23,7 +23,7 @@ def search_q(mesh, q, top_n=10):
     potent_concepts = [chunk.root.text.lower() for chunk in q.noun_chunks]
     for doc2 in mesh.doc_cache.values():
         doc_concepts = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
-        inter = [conc for conc in potent_concepts if conc in doc_concepts]
+        inter = [conc for conc in doc_concepts if conc in doc_concepts]
         results.append({"doc": doc2._.title, "sim": q.similarity(doc2), "related": inter})
     results.sort(key=lambda x: x["sim"], reverse=True)
     return results[:min(len(results) - 1, top_n)]

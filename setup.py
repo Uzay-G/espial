@@ -8,7 +8,7 @@ with open('requirements.txt', encoding='utf-8') as f:
     install_requires = [x.strip() for x in all_reqs]
 
 setup(
-    name='motif_mesh',
+    name='espial',
     version='0.1.0',
     author="Uzay-G",
     author_email="halcyon@disroot.org",
@@ -20,5 +20,5 @@ setup(
     ],
     packages=find_packages(),
     install_requires=install_requires,
-    entry_points={"console_scripts": ["mesh=mesh:motif_mesh"]}
+    entry_points={"console_scripts": ["espial=espial:espial"]}
 )

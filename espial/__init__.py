@@ -2,33 +2,19 @@ import time
 import json
 import re
 from pathlib import Path
+from espial.config import Config
 
 import flask
 from flask_cors import CORS
 import networkx
-import click
 from flask import request, jsonify
 from espial.load import load_mesh
 from espial.analysis import *
-import archivy
+import newspaper
 
-def get_archivy_id(item):
-    return item["path"].split('/')[-1].split('-')[0]
-@click.group()
-
-def espial():
-    """Build a second brain, with a sane amount of effort :)"""
-    pass
-
-@espial.command("run")
-@click.argument("data-dir", type=click.Path(exists=True))
-@click.option("--rerun", help="Regenerate existing concept graph", is_flag=True)
-@click.option("--openness", type=float, help="Negative values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is more prone for exploration. Positive values (don't go too high) will make it more strict (less concepts, higher quality).", default=0)
-@click.option("--batch-size", type=int, help="Processes documents by batches. If running on large documents, you may want to reduce batch size so as not to overload memory.", default=40)
-@click.option("--max-graph-concepts", type=int, help="Upper bound on number of concepts saved in graph.", default=500)
-def run(data_dir, rerun, openness, batch_size, max_graph_concepts):
-    data_dir = Path(data_dir)
-    mesh, nlp, rerun = load_mesh(data_dir, rerun, -openness, batch_size, get_archivy_id)
+def create_app(config=Config()):
+    data_dir = Path(config.data_dir)
+    mesh, nlp, rerun = load_mesh(config)
     b = time.time()
     if rerun:
         print(f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization.")
@@ -43,7 +29,7 @@ def run(data_dir, rerun, openness, batch_size, max_graph_concepts):
         print(time.time() - c, "time spent to remove all uninteresting concepts")
     print(len(mesh.concept_cache), "number of concepts found")
     print(mesh.graph.number_of_edges(), "number of edges left")
-    json_graph = networkx.json_graph.node_link_data(mesh.display_graph(max_graph_concepts))
+    json_graph = networkx.json_graph.node_link_data(mesh.display_graph(config.ANALYSIS["max_concepts"]))
     json.dump(json_graph, (data_dir / "graph.json").open("w"))
     app = flask.Flask(__name__)
     CORS(app)
@@ -113,14 +99,14 @@ def run(data_dir, rerun, openness, batch_size, max_graph_concepts):
     def compare_article():
         url = request.args.get("url")
         top_n = int(request.args.get("top_n", 10))
-        with archivy.app.app_context():
-            d = archivy.models.DataObj(type="bookmark", url=url)
-            d.process_bookmark_url()
-        return jsonify(search_q(mesh, nlp(d.content), top_n))
+        ar = newspaper.Article(url)
+        ar.download()
+        ar.parse()
+        t = search_q(mesh, nlp(ar.text), top_n)
+        print(t)
+        return jsonify(t)
 
     with open("dbg_pain", "w") as f:
         f.write(mesh.dbg)
-    app.run(port=5002)
 
-if __name__ == "__main__":
-    espial()
+    return app

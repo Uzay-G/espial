@@ -149,4 +149,3 @@ class ConceptMesh:
             for conc, score in concepts[max_conc-1:-1]:
                 dg.remove_node(conc)
         return dg
-

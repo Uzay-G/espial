@@ -14,7 +14,9 @@ def espial():
 @click.option("--batch-size", type=int, help="Processes documents by batches. If running on large documents, you may want to reduce batch size so as not to overload memory.", default=40)
 @click.option("--max-concepts", type=int, help="Upper bound on number of concepts saved in graph.", default=500)
 @click.option("--config-path", type=click.Path(exists=True), help="Path to python config.")
-def run(data_dir, rerun, openness, batch_size, max_concepts, config_path):
+@click.option("--port", type=int, help="Port to run server on.", default=5002)
+@click.option("--host", type=str, help="Host to run server on.", default="127.0.0.1")
+def run(data_dir, rerun, openness, batch_size, max_concepts, config_path, port, host):
     if config_path:
         contents = open(config_path)
         config_locals = {}
@@ -24,6 +26,8 @@ def run(data_dir, rerun, openness, batch_size, max_concepts, config_path):
     else:
         config = Config()
     config.data_dir = data_dir
+    config.port = port
+    config.host = host
     config.ANALYSIS = {
         "openness": openness,
         "batch_size": batch_size,
@@ -31,4 +35,4 @@ def run(data_dir, rerun, openness, batch_size, max_concepts, config_path):
         "rerun": rerun
     }
     app = create_app(config)
-    app.run(port=5002)
+    app.run(port=port, host=host)

@@ -93,7 +93,10 @@ def create_app(config=Config()):
         top_n = int(request.args.get("top_n", 10))
         if not q:
             return
-        return jsonify(search_q(mesh, nlp(q), top_n))
+        res = search_q(mesh, nlp(q), top_n)
+        for doc in res:
+            doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
+        return jsonify(res)
 
     @app.route("/article_search")
     def compare_article():
@@ -102,9 +105,10 @@ def create_app(config=Config()):
         ar = newspaper.Article(url)
         ar.download()
         ar.parse()
-        t = search_q(mesh, nlp(ar.text), top_n)
-        print(t)
-        return jsonify(t)
+        res = search_q(mesh, nlp(ar.text), top_n)
+        for doc in res:
+            doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
+        return jsonify(res)
 
     with open("dbg_pain", "w") as f:
         f.write(mesh.dbg)

@@ -48,8 +48,9 @@ def create_app(config=Config()):
 
     @app.route("/best_tags")
     def get_most_relevant_tags():
-        top_n = request.args.get("top_n", 30)
-        return jsonify(most_relevant_tags(mesh, top_n))
+        top_n = int(request.args.get("top_n", 30))
+        only_ents = request.args.get("only_ents", False)
+        return jsonify(most_relevant_tags(mesh, top_n, only_ents))
 
     @app.route("/view_tag/<tag>")
     def view_tag(tag):
@@ -58,7 +59,8 @@ def create_app(config=Config()):
         tag_node = mesh.graph.nodes[tag]
         tag_inf = {
             "score": tag_node['score'],
-            "docs": list(map(lambda x: mesh.doc_cache[x[0]]._.title, mesh.graph.in_edges(tag)))
+            "docs": list(map(lambda x: mesh.doc_cache[x[0]]._.title, mesh.graph.in_edges(tag))),
+            "is_ent": tag_node['is_ent']
         }
         return jsonify(tag_inf)
 

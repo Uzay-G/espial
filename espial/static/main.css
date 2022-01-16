@@ -1,0 +1,45 @@
+.nav {
+	background: #FEECE9;
+	height: 100px;
+	margin: 0;
+	position: fixed;
+	width: 100%;
+	top: 0;
+}
+.nav-links {
+	width: 80%;
+	padding: 15px;
+	display: flex;
+	margin: auto;
+	justify-content: space-between;
+	align-items: center;
+}
+.nav img {
+	height: 60px;
+	width: 60px;
+}
+.home-link {
+	display: flex;
+	align-items: center;
+}
+.nav a {
+
+	font-size: 20px;
+	color: #2C2E43;
+}
+body {
+	padding: 0;
+	margin: 0;
+	overflow: scroll;
+}
+.tags {
+	background: #f6efa6;
+	padding: 4px 7px;
+	margin-left: 6px;
+	display: inline-block;
+}
+.content {
+	margin: auto;
+	margin-top: 150px;
+	width: 80%;
+}

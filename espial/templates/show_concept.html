@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+	<div class="content">
+		<h1>{{ title }}</h1>
+		<h2>Associated documents</h2>
+		<ul>
+			{% for id, title in docs %}
+				<li><a href="/doc/{{ id }}">{{ title }}</a>
+			{% endfor %}
+		</ul>
+	</div>
+{% endblock %}

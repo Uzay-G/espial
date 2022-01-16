@@ -20,7 +20,7 @@ def find_most_sim(mesh, doc_id, top_n=10):
         if doc2._.id != doc_id:
             in_edges2 = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
             inter = [conc for conc in in_edges if conc in in_edges2]
-            results.append({"doc": doc2._.title, "id": doc2._.id, "sim": doc.similarity(doc2), "related": inter})
+            results.append({"id": doc2._.id, "sim": doc.similarity(doc2), "related": inter, "title": doc2._.title})
     results.sort(key=lambda x: x["sim"], reverse=True)
     return results[:min(len(results) - 1, top_n)]
 
@@ -30,8 +30,8 @@ def search_q(mesh, q, top_n=10):
     for doc2 in mesh.doc_cache.values():
         doc_concepts = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
         inter = [conc for conc in doc_concepts if conc in potent_concepts]
-        results.append({"doc": doc2._.title, "id": doc2._.id, "sim": q.similarity(doc2), "related": inter})
-    max_inter = 0
+        results.append({"id": doc2._.id, "sim": q.similarity(doc2), "related": inter, "title": doc2._.title})
+    max_inter = 1
     sim_norm = [0, 0]
     for result in results:
         max_inter = max(max_inter, len(result["related"]))

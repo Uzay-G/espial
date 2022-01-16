@@ -1,0 +1,25 @@
+<html>
+    <head>
+      <title>{{ title }} - Espial</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+	  <link rel="icon" href="{{ url_for('static', filename='archivy.svg')}}" type="image/svg+xml">
+    </head>
+	<body>
+		<div class="nav">
+			<div class="nav-links">
+				<a href="/" class="home-link">
+					<img src="/static/logo.svg">
+					Espial
+				</a>
+				<a href="/search">
+					Search
+				</a>
+			</div>
+		</div>
+			
+		{% block content %}{% endblock %}
+	</body>
+</html>

@@ -13,6 +13,8 @@ from espial.analysis import *
 import newspaper
 
 def create_app(config=Config()):
+    app = flask.Flask(__name__)
+    CORS(app)
     data_dir = Path(config.data_dir)
     mesh, nlp, rerun = load_mesh(config)
     b = time.time()
@@ -31,13 +33,16 @@ def create_app(config=Config()):
     print(mesh.graph.number_of_edges(), "number of edges left")
     json_graph = networkx.json_graph.node_link_data(mesh.display_graph(config.ANALYSIS["max_concepts"]))
     json.dump(json_graph, (data_dir / "graph.json").open("w"))
-    app = flask.Flask(__name__)
-    CORS(app)
     json.dump(json_graph, (Path(app.root_path) / "../force/force.json").open("w"))
 
-    @app.route("/<file>")
-    def serve_file(file):
-        return flask.send_file(f"../force/{file}")
+    search_q(mesh, nlp("test")) # prep search server up - makes results faster
+    @app.route("/")
+    def index():
+        return flask.render_template("index.html", title="Graph", n_nodes=len(mesh.graph.nodes))
+
+    @app.route("/graph")
+    def concept_graph():
+        return flask.render_template("force.html", n_nodes=len(mesh.graph.nodes))
 
     @app.route("/most_sim/<id>")
     def find_sim(id):
@@ -52,28 +57,22 @@ def create_app(config=Config()):
         only_ents = request.args.get("only_ents", False)
         return jsonify(most_relevant_tags(mesh, top_n, only_ents))
 
-    @app.route("/view_tag/<tag>")
-    def view_tag(tag):
-        if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
+    @app.route("/concept/<concept>")
+    def view_concept(concept):
+        if not concept in mesh.graph or not "score" in mesh.graph.nodes[concept]:
             return
-        tag_node = mesh.graph.nodes[tag]
-        tag_inf = {
-            "score": tag_node['score'],
-            "docs": list(map(lambda x: mesh.doc_cache[x[0]]._.title, mesh.graph.in_edges(tag))),
-            "is_ent": tag_node['is_ent']
-        }
-        return jsonify(tag_inf)
+        concept_node = mesh.graph.nodes[concept]
 
-    @app.route("/view_doc/<id>")
+        docs = list(map(lambda x: (x[0], mesh.doc_cache[x[0]]._.title), mesh.graph.in_edges(concept)))
+        return flask.render_template("show_concept.html", title=concept, concept=concept_node, docs=docs)
+
+    @app.route("/doc/<id>")
     def view_doc(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
             return
-        doc_info = {
-            "doc": mesh.doc_cache[id]._.title,
-            "tags": list(map(lambda x: x[1], mesh.graph.out_edges(id))),
-            "info": f"See most similar: http://localhost:5002/most_sim/{id}"
-        }
-        return jsonify(doc_info)
+        tags = list(map(lambda x: x[1], mesh.graph.out_edges(id)))
+        most_sim = find_most_sim(mesh, id)
+        return flask.render_template("show_doc.html", doc=mesh.doc_cache[id], tags=tags, title=mesh.doc_cache[id]._.title, most_sim=most_sim)
 
     @app.route("/create/<tag>")
     def create_tag(tag):
@@ -89,7 +88,7 @@ def create_app(config=Config()):
         readable_paths = list(map(lambda x: x.parts[-1], doc_paths))
         return jsonify({"paths": readable_paths})
 
-    @app.route("/search")
+    @app.route("/semantic_search")
     def search():
         q = request.args.get("q")
         top_n = int(request.args.get("top_n", 10))
@@ -99,6 +98,10 @@ def create_app(config=Config()):
         for doc in res:
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
         return jsonify(res)
+
+    @app.route("/search")
+    def search_view():
+        return flask.render_template("/search.html")
 
     @app.route("/article_search")
     def compare_article():
@@ -127,7 +130,7 @@ def create_app(config=Config()):
                 f.write(contents)
         return "Success", 200
 
-    with open("dbg_pain", "w") as f:
-        f.write(mesh.dbg)
+    #with open("dbg_pain", "w") as f:
+     #   f.write(mesh.dbg)
 
     return app

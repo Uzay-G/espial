@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Force-Directed Layout</title>
+    <script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
+<style>
+body {
+	background: #2C2E43;
+}
+.link {
+  stroke: #ccc;
+}
+
+.node text {
+  pointer-events: none;
+  font: 10px sans-serif;
+}
+
+.link {
+  stroke: #777;
+  stroke-opacity: 0.3;
+  stroke-width: 1.5px;
+}
+
+.node text {
+  display: none;
+  font: 20px sans-serif;
+  z-index: 99;
+  color: #DF5E5E;
+}
+
+
+.node:hover text {
+  display: inline;
+}
+
+.cell {
+  fill: none;
+  pointer-events: all;
+}
+</style>
+  </head>
+  <body>
+    <svg width="{{ n_nodes * 10}} height="{{ n_nodes * 10 }}"></svg>	
+    <script type="text/javascript" src="/static/force4.js"></script>
+
+  </body>
+</html>

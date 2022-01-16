@@ -117,7 +117,7 @@ class ConceptMesh:
             self.concept_cache.pop(concept)
         else:
             self.graph.nodes[concept]["avg_tf_idf"] /= len(self.graph.in_edges(concept))
-            score = avg + word_sim + avg_tf_idf
+            score = min(avg, 0.85)*2 + word_sim + min(avg_tf_idf, 0.5)*2
             self.graph.nodes[concept]["score"] = score
 
     def trim_all(self):
@@ -133,7 +133,7 @@ class ConceptMesh:
         for concept in list(self.concept_cache.keys()):
             if concept in self.graph:
                 z = (len(self.graph.in_edges(concept))- 2)/max_links
-                self.graph.nodes[concept]["score"] += z
+                self.graph.nodes[concept]["score"] += z*1.5
     
     def process_entities(self, doc):
         saved_ents = []

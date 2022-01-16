@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+	<div class="content">
+		<form id="sem-search">
+			<input type="text" id="sem-search-input">
+			<input type="submit" value="Search">
+			<button id="clear-sem">Clear</button>
+		</form>
+		<ul id="sem-search-hits">
+		</ul>
+		<form id="web-search">
+			<input type="url" id="web-search-input">
+			<input type="submit" value="Search">
+			<button id="clear-web">Clear</button>
+		</form>
+		<ul id="web-search-hits">
+		</ul>
+	</div>
+
+	<script>
+		document.getElementById("sem-search").onsubmit = async function(e) {
+			e.preventDefault();
+			let search = document.getElementById("sem-search-input").value;
+			let hits = document.getElementById("sem-search-hits");
+			hits.innerHTML = "";
+			if (search !== "")
+			{
+				let req = await fetch(`/semantic_search?q=${encodeURIComponent(search)}&top_n=20`);
+				let results = await req.json();
+				results.forEach((hit) => {
+					let li = document.createElement("li"), a = document.createElement("a");
+					a.href = hit.id, a.textContent = hit.title;
+					li.appendChild(a);
+					hit.related.forEach((concept) => {
+						let concept_link = document.createElement("a");
+						concept_link.href = `/concept/${concept}`, concept_link.textContent = concept;
+						concept_link.classList.add("tags");
+						li.appendChild(concept_link);
+					})
+					hits.appendChild(li);
+				})
+			}
+		}
+		document.getElementById("clear-sem").onclick = function(e) {
+			document.getElementById("sem-search-input").value = "";
+			document.getElementById("sem-search-hits").innerHTML = "";
+			e.preventDefault();
+		}
+
+		document.getElementById("web-search").onsubmit = async function(e) {
+			e.preventDefault();
+			let search = document.getElementById("web-search-input").value;
+			let hits = document.getElementById("web-search-hits");
+			hits.innerHTML = "";
+			if (search !== "")
+			{
+				let req = await fetch(`/article_search?url=${encodeURIComponent(search)}&top_n=20`);
+				let results = await req.json();
+				results.forEach((hit) => {
+					let li = document.createElement("li"), a = document.createElement("a");
+					a.href = hit.id, a.textContent = hit.title;
+					li.appendChild(a);
+					hit.related.forEach((concept) => {
+						let concept_link = document.createElement("a");
+						concept_link.href = `/concept/${concept}`, concept_link.textContent = concept;
+						concept_link.classList.add("tags");
+						li.appendChild(concept_link);
+					})
+					hits.appendChild(li);
+				})
+			}
+		}
+
+		document.getElementById("clear-web").onclick = function(e) {
+			document.getElementById("web-search-input").value = "";
+			document.getElementById("web-search-hits").innerHTML = "";
+			e.preventDefault();
+		}
+	</script>
+{% endblock %}

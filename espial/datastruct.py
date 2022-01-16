@@ -31,6 +31,7 @@ class ConceptMesh:
     def create_link(self, item, concept, is_ent=False):
         if len(concept) == 1:
             concept = concept[0]
+            orig_text = concept.text
             text = ''.join(filter(lambda x: str.isalnum(x) or x == ' ', concept.lemma_.lower().strip()))
             if concept.is_stop or not concept.is_alpha:
                 return
@@ -38,6 +39,7 @@ class ConceptMesh:
             text = ''.join(filter(lambda x: str.isalnum(x) or x == ' ', concept.text.lower().strip()))
             if concept.root.is_stop or not concept.root.is_alpha :
                 return
+        orig_text = concept.text
         if len(text) < 4: return
         if not text in self.concept_cache:
             self.sim_cache[text] = {}
@@ -47,8 +49,10 @@ class ConceptMesh:
             self.graph.nodes[text]["is_ent"] = True
         if self.graph.has_edge(item, text):
             self.graph[item][text]["count"] += 1
+            self.graph[item][text]["orig"].add(orig_text)
         else:
-            self.graph.add_edge(item, text, count=1)
+            # todo set isn't most efficient
+            self.graph.add_edge(item, text, count=1, orig=set([orig_text]))
             self.graph.nodes[text]["count"] += 1 
         self.graph.nodes[item]["tf"] += 1
 
@@ -182,6 +186,9 @@ class ConceptMesh:
         concepts = [(c, self.graph.nodes[c]["score"]) for c in self.concept_cache.keys()]
         concepts.sort(key=lambda x: x[1], reverse=True)
         dg = self.graph.copy()
+        for e in dg.edges(data=True): # todo make this faster
+            dg[e[0]][e[1]]["orig"] = list(e[2]["orig"])
+
         if max_conc and max_conc < len(concepts):
             for conc, score in concepts[max_conc-1:-1]:
                 dg.remove_node(conc)

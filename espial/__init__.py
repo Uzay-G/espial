@@ -112,6 +112,21 @@ def create_app(config=Config()):
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
         return jsonify(res)
 
+    @app.route("/create_tag/<tag>")
+    def make_tag(tag):
+        if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
+            return
+        doc_edges = list(mesh.graph.in_edges(tag, data=True))
+        for doc, conc, data in doc_edges:
+            path = Path(mesh.graph.nodes[doc]["path"])
+            contents = path.open("r").read()
+            for pattern in data["orig"]:
+                tag_re = re.compile(f"(^|\n| ){pattern}", re.IGNORECASE)
+                contents = tag_re.sub(rf"\1#{tag}"  , contents)
+            with path.open("w") as f:
+                f.write(contents)
+        return "Success", 200
+
     with open("dbg_pain", "w") as f:
         f.write(mesh.dbg)
 

@@ -255,15 +255,7 @@ a:hover {
     text-decoration: underline;
 }
 
-button {
-    border-radius: var(--border-radius);
-    display: inline-block;
-    font-size: medium;
-    font-weight: bold;
-    line-height: var(--line-height);
-    margin: 0.5rem 0;
-    padding: 1rem 2rem;
-}
+
 
 button {
     font-family: var(--font-family);
@@ -342,7 +334,8 @@ input[type="radio"]+label {
 
 input,
 select,
-textarea {
+textarea,
+button {
     border: 1px solid var(--color-bg-secondary);
     border-radius: var(--border-radius);
     margin-bottom: 1rem;
@@ -421,4 +414,7 @@ blockquote footer {
     font-size: small;
     line-height: var(--line-height);
     padding: 1.5rem 0;
+}
+.btns {
+	display: flex;
 }

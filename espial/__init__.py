@@ -101,7 +101,7 @@ def create_app(config=Config()):
 
     @app.route("/search")
     def search_view():
-        return flask.render_template("/search.html")
+        return flask.render_template("/search.html", title="Search")
 
     @app.route("/article_search")
     def compare_article():
@@ -110,10 +110,17 @@ def create_app(config=Config()):
         ar = newspaper.Article(url)
         ar.download()
         ar.parse()
-        res = search_q(mesh, nlp(ar.text), top_n)
-        for doc in res:
+        hits = search_q(mesh, nlp(ar.text), top_n)
+        for doc in hits:
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
-        return jsonify(res)
+        resp = {
+            "hits": hits,
+            "article": {
+                "title": ar.title,
+                "text": ar.text
+            }
+        }
+        return jsonify(resp)
 
     @app.route("/create_tag/<tag>")
     def make_tag(tag):

@@ -1,6 +1,6 @@
 .nav {
 	background: #FEECE9;
-	height: 100px;
+	height: 80px;
 	margin: 0;
 	position: fixed;
 	width: 100%;
@@ -15,8 +15,8 @@
 	align-items: center;
 }
 .nav img {
-	height: 60px;
-	width: 60px;
+	height: 40px;
+	width: 40px;
 }
 .home-link {
 	display: flex;

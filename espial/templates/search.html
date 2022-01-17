@@ -1,17 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
 	<div class="content">
+		<h3>Search your knowledge with a text query</h3>
 		<form id="sem-search">
 			<input type="text" id="sem-search-input">
-			<input type="submit" value="Search">
-			<button id="clear-sem">Clear</button>
+			<div class="btns">
+				<input type="submit" value="Search">
+				<button id="clear-sem">Clear</button>
+			</div>
 		</form>
 		<ul id="sem-search-hits">
 		</ul>
+		<h3>Search your knowledge by inputting an article URL</h3>
 		<form id="web-search">
 			<input type="url" id="web-search-input">
-			<input type="submit" value="Search">
-			<button id="clear-web">Clear</button>
+			<div class="btns">
+				<input type="submit" value="Search">
+				<button id="clear-web">Clear</button>
+			</div>
 		</form>
 		<ul id="web-search-hits">
 		</ul>
@@ -29,7 +35,7 @@
 				let results = await req.json();
 				results.forEach((hit) => {
 					let li = document.createElement("li"), a = document.createElement("a");
-					a.href = hit.id, a.textContent = hit.title;
+					a.href = `/doc/${hit.id}`, a.textContent = hit.title;
 					li.appendChild(a);
 					hit.related.forEach((concept) => {
 						let concept_link = document.createElement("a");
@@ -56,7 +62,10 @@
 			{
 				let req = await fetch(`/article_search?url=${encodeURIComponent(search)}&top_n=20`);
 				let results = await req.json();
-				results.forEach((hit) => {
+				let h3 = document.createElement("h3");
+				h3.textContent = `Search results for "${results.article.title}"`
+				hits.appendChild(h3);
+				results.hits.forEach((hit) => {
 					let li = document.createElement("li"), a = document.createElement("a");
 					a.href = hit.id, a.textContent = hit.title;
 					li.appendChild(a);

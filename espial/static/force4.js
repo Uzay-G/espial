@@ -1,23 +1,29 @@
+function zoomed() {
+	root.attr("transform", d3.event.transform);
+}
 
-  let handle_tag_click = function(d) {
-	  console.log(d.id)
-	  if (!d.title) {
-		window.open(`http://localhost:5002/concept/${d.id}`, '_blank')
-	  }
-	  else {
-		window.open(`http://localhost:5002/doc/${d.id}`, '_blank')
-	  }
+
+let handle_tag_click = function(d) {
+  console.log(d.id)
+  if (!d.title) {
+	window.open(`http://localhost:5002/concept/${d.id}`, '_blank')
   }
+  else {
+	window.open(`http://localhost:5002/doc/${d.id}`, '_blank')
+  }
+}
 
 var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height");
 
+let root = svg.select("#root");
 
+let tickIndex = 0;
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(100))
     .force("charge", d3.forceManyBody().strength(-400))
-    .force("center", d3.forceCenter(width / 2, height / 2));
+    .force("center", d3.forceCenter(width / 2, height / 2))
 
 d3.json("/static/force.json", function(error, graph) {
   if (error) throw error;
@@ -26,7 +32,7 @@ d3.json("/static/force.json", function(error, graph) {
 // var color = d3.scaleOrdinal(d3.schemeGreys)
 var color = d3.scaleOrdinal(d3.schemeBlues)
 
-  var link = svg.append("g")
+  var link = root.append("g")
       .attr("class", "links")
     .selectAll("line")
     .data(graph.links)
@@ -35,7 +41,7 @@ var color = d3.scaleOrdinal(d3.schemeBlues)
 	.attr("stroke", "#999")
 		  .attr("stroke-opacity", 0.6)
 
-  var node = svg.append("g")
+  var node = root.append("g")
       .attr("class", "nodes")
     .selectAll("g")
     .data(graph.nodes)
@@ -82,6 +88,7 @@ var color = d3.scaleOrdinal(d3.schemeBlues)
       .links(graph.links);
 
   function ticked() {
+	zoomFit(1);
     link
         .attr("x1", function(d) { return d.source.x; })
         .attr("y1", function(d) { return d.source.y; })
@@ -112,4 +119,42 @@ function dragended(d) {
   d.fy = null;
 }
 
+let circles = root.selectAll("circle");
+const zoom = d3.zoom().on("zoom", zoomed);
+svg.call(zoom);
 
+
+function zoomFit(initial) {
+	// modification of http://bl.ocks.org/TWiStErRob/b1c62730e01fe33baa2dea0d0aa29359
+	let scale;
+	initial = initial || false;
+	if (initial)
+	{
+		tickIndex++;
+		if (tickIndex != 5) return; // wait for some of the graph to load
+		svg.style("visibility", "visible"); // then make it visible and fit size
+		scale = 1.15;
+	}
+	else scale = 3;
+	let nodes = root.selectAll(".node").data()
+    var bounds = root.node().getBBox();
+    var parent = root.node().parentElement;
+    var fullWidth = parent.clientWidth || parent.parentNode.clientWidth,
+        fullHeight = parent.clientHeight || parent.parentNode.clientHeight;
+    var width = bounds.width,
+        height = bounds.height;
+    var midX = bounds.x + width / 2,
+        midY = bounds.y + height / 2;
+    if (width == 0 || height == 0) return; // nothing to fit
+    scale = scale / Math.max(width / fullWidth, height / fullHeight);
+    var translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+
+    console.trace("zoomFit", translate, scale);
+	svg
+	  .transition()
+	  .duration(0) // milliseconds
+	  .call(zoom.transform, d3.zoomIdentity
+	  	.translate(translate[0], translate[1])
+	  	.scale(scale)
+	  );
+}

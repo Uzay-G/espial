@@ -1,4 +1,6 @@
 from hashlib import sha256
+from pathlib import Path
+import re
 
 class Config(object):
 
@@ -21,3 +23,15 @@ class Config(object):
 
     def get_link(self, item):
         return f"{config.host}:{config.port}/view_item/{item['id']}"
+
+    def create_tag(self, concept, mesh):
+        for doc, concept, data in mesh.graph.in_edges(concept, data=True):
+            path = Path(mesh.graph.nodes[doc]["path"])
+            matching_occurs = data["orig"] # edge['orig'] stores the words in the original text that caused the link
+            print(matching_occurs)
+            tag_re = re.compile(rf"(^|\n| )({'|'.join(matching_occurs)})($|\n| )", re.IGNORECASE)
+            print(rf"(^|\n| )({'|'.join(matching_occurs)})($|\n| )")
+            contents = tag_re.sub(rf"\1#{concept}\3" ,path.open("r").read())
+            with path.open("w") as f:
+                f.write(contents)
+

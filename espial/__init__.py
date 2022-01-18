@@ -74,20 +74,6 @@ def create_app(config=Config()):
         most_sim = find_most_sim(mesh, id)
         return flask.render_template("show_doc.html", doc=mesh.doc_cache[id], tags=tags, title=mesh.doc_cache[id]._.title, most_sim=most_sim)
 
-    @app.route("/create/<tag>")
-    def create_tag(tag):
-        if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
-            return
-        doc_paths = list(map(lambda x: Path(mesh.graph.nodes[x[0]]["path"]), mesh.graph.in_edges(tag)))
-        print(doc_paths)
-        for path in doc_paths:
-            tag_re = re.compile(f"(^|\n| )({tag})", re.IGNORECASE)
-            contents = tag_re.sub(r"\1#\2" ,path.open("r").read())
-            with path.open("w") as f:
-                f.write(contents)
-        readable_paths = list(map(lambda x: x.parts[-1], doc_paths))
-        return jsonify({"paths": readable_paths})
-
     @app.route("/semantic_search")
     def search():
         q = request.args.get("q")
@@ -122,19 +108,11 @@ def create_app(config=Config()):
         }
         return jsonify(resp)
 
-    @app.route("/create_tag/<tag>")
-    def make_tag(tag):
-        if not tag in mesh.graph or not "score" in mesh.graph.nodes[tag]:
+    @app.route("/create/<concept>")
+    def make_tag(concept):
+        if not concept in mesh.concept_cache:
             return
-        doc_edges = list(mesh.graph.in_edges(tag, data=True))
-        for doc, conc, data in doc_edges:
-            path = Path(mesh.graph.nodes[doc]["path"])
-            contents = path.open("r").read()
-            for pattern in data["orig"]:
-                tag_re = re.compile(f"(^|\n| ){pattern}", re.IGNORECASE)
-                contents = tag_re.sub(rf"\1#{tag}"  , contents)
-            with path.open("w") as f:
-                f.write(contents)
+        config.create_tag(concept, mesh)
         return "Success", 200
 
     #with open("dbg_pain", "w") as f:

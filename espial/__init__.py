@@ -33,7 +33,7 @@ def create_app(config=Config()):
     print(mesh.graph.number_of_edges(), "number of edges left")
     json_graph = networkx.json_graph.node_link_data(mesh.display_graph(config.ANALYSIS["max_concepts"]))
     json.dump(json_graph, (data_dir / "graph.json").open("w"))
-    json.dump(json_graph, (Path(app.root_path) / "../force/force.json").open("w"))
+    json.dump(json_graph, (Path(app.root_path) / "static/force.json").open("w"))
 
     search_q(mesh, nlp("test")) # prep search server up - makes results faster
     @app.route("/")
@@ -108,14 +108,29 @@ def create_app(config=Config()):
         }
         return jsonify(resp)
 
-    @app.route("/create/<concept>")
+    @app.route("/create_tag/<concept>")
     def make_tag(concept):
         if not concept in mesh.concept_cache:
             return
         config.create_tag(concept, mesh)
         return "Success", 200
 
+    @app.route("/create_concept_note/<concept>")
+    def concept_note(concept):
+        if not concept in mesh.concept_cache:
+            return
+        config.create_concept_note(concept, mesh)
+        return "Success", 200
+
+    @app.route("/misc")
+    def misc_page():
+        return flask.render_template("misc.html", title="Misc")
     #with open("dbg_pain", "w") as f:
      #   f.write(mesh.dbg)
 
+    @app.route("/create_all_concept_notes")
+    def create_all_concept_notes():
+        for concept in mesh.concept_cache:
+            config.create_concept_note(concept, mesh)
+        return "Success", 200
     return app

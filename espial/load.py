@@ -10,6 +10,7 @@ from hashlib import sha256
 
 hash_fn = lambda item: sha256(item["content"].encode()).hexdigest()
 
+
 def load_mesh(config):
     data_dir = Path(config.data_dir)
     openness = config.ANALYSIS["openness"]
@@ -24,10 +25,14 @@ def load_mesh(config):
         if any([path.parent == data_dir / p for p in config.IGNORE]):
             continue
         content = path.open("r").read()
-        item = {"content": content, "title": config.get_title(path, content), "path": str(path)}
+        item = {
+            "content": content,
+            "title": config.get_title(path, content),
+            "path": str(path),
+        }
         item["hash"] = hash_fn(item)
         items[config.get_item_id(item)] = item
-    saved_graph = (data_dir / "graph.json")
+    saved_graph = data_dir / "graph.json"
     doc_cache = {}
     a = time.time()
     docs = []
@@ -39,8 +44,14 @@ def load_mesh(config):
             deleted_docs = False
             for doc in doc_bin.get_docs(nlp.vocab):
                 doc._.id = str(doc._.id)
-                excluded_path = any([Path(doc._.path).parent == data_dir / p for p in config.IGNORE])
-                if doc._.id in items and doc._.hash == items[doc._.id]["hash"] and not excluded_path:
+                excluded_path = any(
+                    [Path(doc._.path).parent == data_dir / p for p in config.IGNORE]
+                )
+                if (
+                    doc._.id in items
+                    and doc._.hash == items[doc._.id]["hash"]
+                    and not excluded_path
+                ):
                     docs.append(doc)
                 else:
                     deleted_docs = True
@@ -59,28 +70,48 @@ def load_mesh(config):
     unseen_docs = []
     for id, item in items.items():
         item["content"] = process_markdown(item["content"])
-        if not id in doc_cache and len(item["content"]) < 1000000/10:
-            unseen_docs.append((item["content"], {"id": id, "title": item["title"], "path": item["path"], "hash": item["hash"]}))
+        if not id in doc_cache and len(item["content"]) < 1000000 / 10:
+            unseen_docs.append(
+                (
+                    item["content"],
+                    {
+                        "id": id,
+                        "title": item["title"],
+                        "path": item["path"],
+                        "hash": item["hash"],
+                    },
+                )
+            )
     if unseen_docs:
         rerun = 1
 
     if saved_graph.exists() and not rerun:
-        loaded_graph = networkx.json_graph.node_link_graph(json.load(saved_graph.open("r")))
-        if openness != loaded_graph.graph["openness"]: rerun = 1
-        else: 
+        loaded_graph = networkx.json_graph.node_link_graph(
+            json.load(saved_graph.open("r"))
+        )
+        if openness != loaded_graph.graph["openness"]:
+            rerun = 1
+        else:
             for node in loaded_graph.nodes():
                 if loaded_graph.nodes[node]["type"] == "concept":
-                    mesh.concept_cache[node] = None # don't load the NLP
+                    mesh.concept_cache[node] = None  # don't load the NLP
             mesh.graph = loaded_graph
             print("loading graphs")
-    else: rerun = 1
+    else:
+        rerun = 1
 
     list(map(lambda x: mesh.process_document(x, index_concepts=rerun), docs))
     print(f"{len(unseen_docs)} new docs.")
     i = 0
-    for doc, ctx in nlp.pipe(unseen_docs, as_tuples=True, disable=["textcat"], batch_size=config.ANALYSIS["batch_size"]):
+    for doc, ctx in nlp.pipe(
+        unseen_docs,
+        as_tuples=True,
+        disable=["textcat"],
+        batch_size=config.ANALYSIS["batch_size"],
+    ):
         i += 1
-        if i % config.ANALYSIS["batch_size"] == 0: print(f"{i} docs processed.")
+        if i % config.ANALYSIS["batch_size"] == 0:
+            print(f"{i} docs processed.")
         doc._.title = ctx["title"]
         doc._.id = ctx["id"]
         doc._.path = ctx["path"]
@@ -90,7 +121,9 @@ def load_mesh(config):
             mesh.remove_doc(ctx["id"])
         mesh.process_document(doc)
 
-    print(time.time() - a, f"time spent to process docs, of {len(unseen_docs)} new ones.")
+    print(
+        time.time() - a, f"time spent to process docs, of {len(unseen_docs)} new ones."
+    )
     if len(unseen_docs):
         with dumped_annot.open("wb") as f:
             f.write(doc_bin.to_bytes())

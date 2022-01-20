@@ -12,17 +12,18 @@ def sigmoid(z):
     return 1/(1 + np.exp(-z))
 
 class ConceptMesh:
-    def __init__(self, mode, doc_cache):
-        self.graph = networkx.DiGraph(openness=mode)
+    def __init__(self, conf, doc_cache):
+        self.graph = networkx.DiGraph(openness=conf["openness"])
         self.doc_cache = doc_cache
         self.concept_cache = {}
         self.nb_docs = 0
         self.dbg = ""
+        self.conf = conf
         self.sim_cache = {}
 
-        if mode:
-            self.avg_exp_o = 0.025 * mode
-            self.tf_exp_o = 0.0001 * mode
+        if conf["openness"]:
+            self.avg_exp_o = 0.04 * -conf["openness"]
+            self.tf_exp_o = 0.001 * -conf["openness"]
         else:
             self.avg_exp_o = 0
             self.tf_exp_o = 0
@@ -31,7 +32,6 @@ class ConceptMesh:
     def create_link(self, item, concept, is_ent=False):
         if len(concept) == 1:
             concept = concept[0]
-            orig_text = concept.text
             text = ''.join(filter(lambda x: str.isalnum(x) or x == ' ', concept.lemma_.lower().strip()))
             if concept.is_stop or not concept.is_alpha:
                 return
@@ -76,11 +76,14 @@ class ConceptMesh:
                     self.graph[item][concept]["tf_idf"] = tf_idf
                     self.graph.nodes[concept]["avg_tf_idf"] += tf_idf
         for concept in list(self.concept_cache.keys()):
-            if len(list(self.graph.in_edges(concept))) < 2:
+            if len(list(self.graph.in_edges(concept))) < self.conf["cutoffs"]["min_links"]:
                 self.graph.remove_node(concept)
                 self.concept_cache.pop(concept)
             else:
                 self.graph.nodes[concept]["avg_tf_idf"] /= len(list(self.graph.in_edges(concept)))
+
+        for item, concept in self.graph.edges:
+            self.dbg += f"EDGE {self.doc_cache[item]._.title} {item} {concept}\n"
 
     def trim_concept(self, concept):
         avg = 0
@@ -104,32 +107,30 @@ class ConceptMesh:
                         self.sim_cache[doc1][doc2] = curr_sim
                         self.sim_cache[doc2][doc1] = curr_sim
                     avg += self.sim_cache[doc1][doc2]
-        avg /= n
+        avg = (n == 0) or avg/n
         total_in_edges = len(linked_docs)
         word_sim /= (total_in_edges == 0) or total_in_edges
         if not has_vector: word_sim = 1
-        ent_criteria = avg < 0.6 + self.avg_exp_o or word_sim < 0.3 # prev avg: 0.85
         avg_tf_idf = self.graph.nodes[concept]["avg_tf_idf"]
-        word_crit = avg < 0.6 + self.avg_exp_o or word_sim < 0.4 + self.avg_exp_o * 0.5 or avg_tf_idf < 0.1
-        self.dbg += f"TRIMMING {total_in_edges} {avg} {word_sim} {concept}length{len(concept.split())}\n"
+        cutoffs = self.conf["cutoffs"]
+        ent_criteria = avg < cutoffs["min_avg_children_sim"] or word_sim < cutoffs["min_avg_ent_sim"] and avg_tf_idf < cutoffs["min_avg_ent_tf_idf"]
+        word_crit = avg < cutoffs["min_avg_children_sim"] or word_sim < cutoffs["min_avg_word_sim"] or avg_tf_idf < cutoffs["min_avg_word_tf_idf"]
+        self.dbg += f"TRIMMING {total_in_edges} {avg} {word_sim} {concept}\n"
         if (word_crit and not is_ent) or (ent_criteria and is_ent):
             self.graph.remove_node(concept)
             self.concept_cache.pop(concept)
         else:
-            self.graph.nodes[concept]["avg_tf_idf"] /= len(self.graph.in_edges(concept))
+            if not is_ent and avg_tf_idf < 0.1:
+                print(concept)
             score = min(avg, 0.85)*2 + word_sim + min(avg_tf_idf, 0.5)*2
             self.graph.nodes[concept]["score"] = score
 
     def trim_all(self):
-        #avg_links = 0
-        #n = 0
         max_links = 0
         for concept in list(self.concept_cache.keys()):
             if concept in self.graph:
                 self.trim_concept(concept)
                 max_links = max(max_links, len(list(self.graph.in_edges(concept)))-2)
-                #avg_links += len(self.graph.in_edges(concept))
-                #n += 1
         for concept in list(self.concept_cache.keys()):
             if concept in self.graph:
                 z = (len(self.graph.in_edges(concept))- 2)/max_links

@@ -21,6 +21,8 @@ def load_mesh(config):
     Doc.set_extension("hash", default=None)
     items = {}
     for path in data_dir.rglob("*.md"):
+        if any([path.parent == data_dir / p for p in config.IGNORE]):
+            continue
         content = path.open("r").read()
         item = {"content": content, "title": config.get_title(path, content), "path": str(path)}
         item["hash"] = hash_fn(item)
@@ -32,11 +34,13 @@ def load_mesh(config):
     dumped_annot = data_dir / "serialized_annot"
     if dumped_annot.exists():
         with dumped_annot.open("rb") as f:
+
             doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
             deleted_docs = False
             for doc in doc_bin.get_docs(nlp.vocab):
                 doc._.id = str(doc._.id)
-                if doc._.id in items and doc._.hash == items[doc._.id]["hash"]:
+                excluded_path = any([Path(doc._.path).parent == data_dir / p for p in config.IGNORE])
+                if doc._.id in items and doc._.hash == items[doc._.id]["hash"] and not excluded_path:
                     docs.append(doc)
                 else:
                     deleted_docs = True
@@ -49,7 +53,7 @@ def load_mesh(config):
     else:
         doc_bin = DocBin(store_user_data=True)
 
-    mesh = ConceptMesh(openness, doc_cache)
+    mesh = ConceptMesh(config.ANALYSIS, doc_cache)
     mesh.nb_docs = len(docs)
 
     unseen_docs = []

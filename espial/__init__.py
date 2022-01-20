@@ -125,8 +125,8 @@ def create_app(config=Config()):
     @app.route("/misc")
     def misc_page():
         return flask.render_template("misc.html", title="Misc")
-    #with open("dbg_pain", "w") as f:
-     #   f.write(mesh.dbg)
+    with open("dbg_pain", "w") as f:
+        f.write(mesh.dbg)
 
     @app.route("/create_all_concept_notes")
     def create_all_concept_notes():

@@ -1,6 +1,10 @@
+Espial is a <>
+
+![demo gif](/img/espial.gif)
+
 ## Installation
 - clone repo
-- `pip install requirements.txt`
+- `pip install -r requirements.txt`
 - `python -m spacy download en_core_web_md`
 - `pip install .`
 

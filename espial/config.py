@@ -19,6 +19,7 @@ class Config(object):
                 "min_avg_word_tf_idf": 0.075,
                 "min_avg_ent_tf_idf": 0.01,
             },
+            "scrape_links": False
         }
         self.port = 5002
         self.host = "127.0.0.1"

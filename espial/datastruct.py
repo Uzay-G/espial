@@ -108,8 +108,8 @@ class ConceptMesh:
                     list(self.graph.in_edges(concept))
                 )
 
-        for item, concept in self.graph.edges:
-            self.dbg += f"EDGE {self.doc_cache[item]._.title} {item} {concept}\n"
+        #for item, concept in self.graph.edges:
+        #    self.dbg += f"EDGE {self.doc_cache[item]._.title} {item} {concept}\n"
 
     def trim_concept(self, concept):
         avg = 0
@@ -152,13 +152,11 @@ class ConceptMesh:
             or word_sim < cutoffs["min_avg_word_sim"]
             or avg_tf_idf < cutoffs["min_avg_word_tf_idf"]
         )
-        self.dbg += f"TRIMMING {total_in_edges} {avg} {word_sim} {concept}\n"
+        #self.dbg += f"TRIMMING {total_in_edges} {avg} {word_sim} {concept}\n"
         if (word_crit and not is_ent) or (ent_criteria and is_ent):
             self.graph.remove_node(concept)
             self.concept_cache.pop(concept)
         else:
-            if not is_ent and avg_tf_idf < 0.1:
-                print(concept)
             score = min(avg, 0.85) * 2 + word_sim + min(avg_tf_idf, 0.5) * 2
             self.graph.nodes[concept]["score"] = score
 
@@ -194,7 +192,6 @@ class ConceptMesh:
                         saved_ents.append(ent[i : i + 2])
                 if len(ent) > 1:
                     for i in range(len(ent)):
-                        self.dbg += f"RND{ent[i:i+1]}RND\n"
                         saved_ents.append(ent[i : i + 1])
                 saved_ents.append(ent)
         return saved_ents

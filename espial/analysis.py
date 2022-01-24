@@ -1,4 +1,5 @@
 from html2text import html2text
+from readability import Document
 import requests
 import re
 
@@ -127,18 +128,26 @@ def process_markdown(content):
     return content
 
 
-def load_url(url):
+def load_url(url, nlp):
     """
     Process url to get content for analysis.
-
-    Returns (status, result) tuple; false if failed, true if succeeded.
     """
     try:
         url_request = requests.get(
-            self.url,
-            headers={"User-agent": f"Archivy/v{require('archivy')[0].version}"},
+            url,
+            headers={"User-agent": f"Espial/v0.1"},
         )
     except Exception:
-        return (False, "Could not load webpage.")
-    content = html2text(url_request.text, bodywidth=0)
-    return (True, process_markdown(content))
+        return False
+    html_doc = Document(url_request.text)
+    content = html2text(html_doc.summary(), bodywidth=0) 
+    doc = nlp(content)
+    doc._.id = url
+    doc._.title = html_doc.short_title() or url
+    return doc
+
+
+def extract_urls(content):
+    URL_REGEX = re.compile('((?:https?):(?:(?://)|(?:\\\\))+(?:[\w\d:#@%/;$~_?\+-=\\\.&](?:#!)?)*)', re.DOTALL)
+    urls = re.findall(URL_REGEX, content)
+    return urls

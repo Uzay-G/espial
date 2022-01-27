@@ -149,8 +149,8 @@ class ConceptMesh:
         )
         word_crit = (
             avg < cutoffs["min_avg_children_sim"]
-            or word_sim < cutoffs["min_avg_word_sim"]
-            or avg_tf_idf < cutoffs["min_avg_word_tf_idf"]
+            or word_sim < cutoffs["min_avg_noun_sim"]
+            or avg_tf_idf < cutoffs["min_avg_noun_tf_idf"]
         )
         #self.dbg += f"TRIMMING {total_in_edges} {avg} {word_sim} {concept}\n"
         if (word_crit and not is_ent) or (ent_criteria and is_ent):

@@ -14,9 +14,9 @@ class Config(object):
             "cutoffs": {  # criteria used to remove a concept
                 "min_links": 2,  # min number of doc-concept links
                 "min_avg_children_sim": 0.6,  # avg similarty of the child of a concept
-                "min_avg_word_sim": 0.4,  # min avg similartiy of concept vector, if it's a word, with its children
+                "min_avg_noun_sim": 0.4,  # min avg similartiy of concept vector, if it's a word, with its children
                 "min_avg_ent_sim": 0.3,  # same but for entities
-                "min_avg_word_tf_idf": 0.075,
+                "min_avg_noun_tf_idf": 0.075,
                 "min_avg_ent_tf_idf": 0.01,
             },
             "scrape_links": False

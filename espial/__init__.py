@@ -20,14 +20,13 @@ def create_app(config=Config()):
     b = time.time()
     if rerun:
         print(
-            f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization."
+            f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization. {len(mesh.concept_cache)} concepts."
         )
         mesh.remove_irrelevant_edges()
         print(
             mesh.graph.number_of_edges(),
             "number of doc-concept links after tf-idf pre-processing",
         )
-        print(len(mesh.concept_cache), "number of concepts before relevance cleaning.")
         z = time.time()
         print(time.time() - z, "merges")
         c = time.time()

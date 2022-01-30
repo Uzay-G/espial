@@ -10,9 +10,9 @@ Espial's main data structure is a Python class called [`ConceptMesh`](/espial/da
 
 ## Loading
 
-Espial has to compute quite a few things on your knowledge, so it tries to cache as much as it can using Spacy and JSON dumps it outputs. The library computes a hash of each document which it then compares to the old hashes. If it notices any differences, it reruns its analysis algorithm to find new concepts and links.
+Espial has to compute quite a few things on your knowledge, so it tries to cache as much as it can using Spacy's cache format and JSON dumps. The library computes a hash of each document which it then compares to the old hashes. If it notices any differences, it reruns its analysis algorithm to find new concepts and links.
 
-Each document is analyzed with Spacy in batches, the higher the `ANALYSIS["batch_size"]` you set the higher the memory use. It's only analyzed once thanks to caching, even on subsequent runs.
+Each document is analyzed with Spacy in batches, the higher the `ANALYSIS["batch_size"]` you set the higher the memory consumption. It's only analyzed once thanks to caching, even on subsequent runs.
 
 ## Initial Concept Detection
 
@@ -45,9 +45,9 @@ Espial begins with an analysis of the relevance of specific links between docume
 tf_idf = number of times concept appeared in a document * log(total_documents / number of documents concept is mentioned in)
 ```
 
-Basically: is this specific concept actually relevant to this document in terms of its frequency **and how much it's used in other documents**? This heuristic is maximized if the concept occurs a lot in the given document and doesn't occur too much in other documents — we want to avoid generality with concepts like `thing`.
+Basically: tf-idf tells us if this specific concept is actually relevant to the document in terms of its frequency **and how much it's used in other documents**. This heuristic is maximized if the concept occurs a lot in the given document and doesn't occur too much in other documents — we want to avoid generality with concepts like `thing`.
 
-`ANALYSIS["cutoffs"]["min_avg_word_tf_idf"]` / `ANALYSIS["cutoffs"]["min_avg_word_tf_idf"]`
+The cutoff for this step is set in `ANALYSIS["cutoffs"]["min_avg_noun_tf_idf"]` / `ANALYSIS["cutoffs"]["min_avg_ent_tf_idf"]`
 
 During this round, we also save the average tf_idf score of a concept to its linked documents.
 
@@ -57,9 +57,9 @@ With those links removed, we then compute a series of heuristics to decide which
 
 Before we get into the algorithm, it's important to understand the idea of a [word embedding](https://en.wikipedia.org/wiki/Word_embedding).
 
-A word embedding is a vector of real numbers that represents a word's meaning, often obtained by studying the distribution and position of the word in sentences, in conjunction with the position of other words.
+A word embedding is a vector of real numbers that represents a word's meaning, often obtained by studying the distribution and position of words in a dataset. 
 
-Representing semantic meaning as a vector allows you to use many basic mathematical properties of vectors but on words themselves, for example similarity of words.
+Representing semantic meaning as a vector allows you to use many basic mathematical properties of vectors for example to calculate the similarity of words.
 
 You can also average word vectors to create document vectors, a measure of the semantic meaning of a document.
 
@@ -67,10 +67,10 @@ Espial uses the following measures to decide which concepts get kicked and which
 
 Let X be the concept we're studying, and D its associated documents after Step 1.
 
-- Average Grouped Similarity: Espial calculates the one-to-one similarity of each document in D and then averages it. If it's too low it means documents grouped by X aren't that related. We can infer that X is thus not super interesting as a concept, if D's elements don't have some commonality. Although this isn't always true, it's a useful approximation.
-- Average Word Similarity: For each document in D, we calculate the similarity of D and the word embedding of our concept X. We average this and if it's too low we can determine that X isn't really relevant to the documents it's linked to.
-- Average TF-IDF: This is really interesting. I found it works better to lower the TF-IDF threshold in step 1, and then increase the cutoff for the **average TF-IDF** score of the concept. This is intuitive: we want X to have meaning in our knowledge base **overall**, but sometimes a quick mention of X in a document that isn't directly focused on X can be useful. If our concept is `databases`, we don't strictly want it to link to posts strictly focused on databases, we're also interested in matches that mention databases on the side. To prevent noise, we allow this type of loose link and enforce instead that the **concept itself is on average not used too liberally — it is statistically important for enough notes.**
-- Minimum Linkage: We also check that above a certain threshold of documents in D.
+- **Average Grouped Similarity**: Espial calculates the one-to-one similarity of each document in D and then averages it. If it's too low it means documents grouped by X aren't that related. We can infer that X is thus not super interesting as a concept, if D's elements don't have some commonality. Although this isn't always true, it's a useful approximation.
+- **Average Word Similarity**: For each document in D, we calculate the similarity of the document to the word embedding of our concept X. We average this and if it's too low we can determine that X isn't really relevant to the documents it's linked to.
+- **Average TF-IDF**: It works better to lower the TF-IDF threshold in step 1, and then increase the cutoff for the **average TF-IDF** score of the concept. This is intuitive: we want X to have meaning in our knowledge base **overall**, but sometimes a quick mention of X in a document that isn't directly focused on X can be useful. If our concept is `databases`, we don't strictly want it to link to posts strictly focused on databases, we're also interested in matches that mention databases on the side. To prevent noise, we allow this type of loose link and enforce instead that the **concept itself is on average not used too liberally — it is statistically important for enough notes.**
+- Minimum Linkage: We also check that X is linked to at least a certain threshold of documents in D.
 
 
 ## Display

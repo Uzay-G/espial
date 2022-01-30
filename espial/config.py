@@ -6,7 +6,7 @@ import re
 class Config(object):
     def __init__(self):
         self.data_dir = ""
-        self.ANALYSIS = {
+        self.ANALYSIS = { # conf of the actual analysis algorithm
             "openness": 0,  # Positive values (eg -1) will lower the thresholds motif mesh uses when deciding whether to add links / ideas to the graph or not. This is better for exploration. Negative values will make it more strict (less concepts, higher quality).
             "max_concepts": 500,  # Upper bound on number of concepts saved in graph.
             "batch_size": 40,  # Processes documents by batches. If running on large documents, you may want to reduce batch size so as not to overload memory.
@@ -21,20 +21,30 @@ class Config(object):
             },
             "scrape_links": False
         }
-        self.port = 5002
+        self.port = 5002 # port to run Espial on
         self.host = "127.0.0.1"
-        self.IGNORE = []
+        self.IGNORE = [] # sub-directories to ignore when crawling
 
     def get_item_id(self, item):
+        """
+        Gets the id of the document. If your knowledge base has IDs you can fetch them here, otherwise Espial will compute a hash
+        """
         return sha256(item["content"].encode()).hexdigest()
 
     def get_title(self, path, contents):
+        """
+        Gets the title of the document. If your knowledge base uses attributes like frontmatter this is recommended. Defaults to the filename.
+        """
         return path.parts[-1]
 
     def get_link(self, item):
+        """Creates a link to the item, defaulting to Espial's view."""
         return f"[{item._.title}](http://{self.host}:{self.port}/view_item/{item._.id})"
 
     def create_tag(self, concept, mesh):
+        """
+        Creates a tag by replacing occurences of the concept with #concept.
+        """
         for doc, concept, data in mesh.graph.in_edges(concept, data=True):
             path = Path(mesh.graph.nodes[doc]["path"])
             matching_occurs = data[
@@ -42,12 +52,15 @@ class Config(object):
             ]  # edge['orig'] stores the words in the original text that caused the link
             tag_re = re.compile(
                 rf"(^|\n| )({'|'.join(matching_occurs)})($|\n| )", re.IGNORECASE
-            )
+            ) # for each word that lead to the concept, replace it with #concept
             contents = tag_re.sub(rf"\1#{concept}\3", path.open("r").read())
             with path.open("w") as f:
                 f.write(contents)
 
     def create_concept_note(self, concept, mesh):
+        """
+        Creates a note listing all the documents related to a given concept.
+        """
         contents = f"# {concept}\n"
         for doc, concept, data in mesh.graph.in_edges(concept, data=True):
             doc = mesh.doc_cache[doc]

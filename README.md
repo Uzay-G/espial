@@ -77,7 +77,7 @@ class Config(Config):
 		<>
 ```
 
-If you like the software, consider [sponsoring me](https://github.com/Uzay-G/espial). I'm a student and the support is really useful!! If you use it in your own projects, please credit the original library.
+If you like the software, consider [sponsoring me](https://github.com/Uzay-G/espial). I'm a student and the support is really useful. If you use it in your own projects, please credit the original library.
 
-If you have ideas for the project and how to make it better, please open an issue or contact me!
+If you have ideas for the project and how to make it better, please open an issue or contact me.
 

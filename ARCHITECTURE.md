@@ -47,7 +47,7 @@ tf_idf = number of times concept appeared in a document * log(total_documents / 
 
 Basically: tf-idf tells us if this specific concept is actually relevant to the document in terms of its frequency **and how much it's used in other documents**. This heuristic is maximized if the concept occurs a lot in the given document and doesn't occur too much in other documents — we want to avoid generality with concepts like `thing`.
 
-The cutoff for this step is set in `ANALYSIS["cutoffs"]["min_avg_noun_tf_idf"]` / `ANALYSIS["cutoffs"]["min_avg_ent_tf_idf"]`
+The cutoff for this step is set in `ANALYSIS["cutoffs"]["min_edge_ent_tf_idf"]` / `ANALYSIS["cutoffs"]["min_edge_noun_tf_idf"]`
 
 During this round, we also save the average tf_idf score of a concept to its linked documents.
 
@@ -67,11 +67,10 @@ Espial uses the following measures to decide which concepts get kicked and which
 
 Let X be the concept we're studying, and D its associated documents after Step 1.
 
-- **Average Grouped Similarity**: Espial calculates the one-to-one similarity of each document in D and then averages it. If it's too low it means documents grouped by X aren't that related. We can infer that X is thus not super interesting as a concept, if D's elements don't have some commonality. Although this isn't always true, it's a useful approximation.
-- **Average Word Similarity**: For each document in D, we calculate the similarity of the document to the word embedding of our concept X. We average this and if it's too low we can determine that X isn't really relevant to the documents it's linked to.
-- **Average TF-IDF**: It works better to lower the TF-IDF threshold in step 1, and then increase the cutoff for the **average TF-IDF** score of the concept. This is intuitive: we want X to have meaning in our knowledge base **overall**, but sometimes a quick mention of X in a document that isn't directly focused on X can be useful. If our concept is `databases`, we don't strictly want it to link to posts strictly focused on databases, we're also interested in matches that mention databases on the side. To prevent noise, we allow this type of loose link and enforce instead that the **concept itself is on average not used too liberally — it is statistically important for enough notes.**
-- Minimum Linkage: We also check that X is linked to at least a certain threshold of documents in D.
-
+- **Average Grouped Similarity**: Espial calculates the one-to-one similarity of each document in D and then averages it. If it's too low it means documents grouped by X aren't that related. We can infer that X is thus not super interesting as a concept, if D's elements don't have some commonality. Although this isn't always true, it's a useful approximation. `cutoffs['min_avg_children_sim']`
+- **Average Word Similarity**: For each document in D, we calculate the similarity of the document to the word embedding of our concept X. We average this and if it's too low we can determine that X isn't really relevant to the documents it's linked to. `cutoffs['min_avg_ent_sim'/'min_avg_noun_sim']`
+- **Average TF-IDF**: It works better to lower the TF-IDF threshold in step 1, and then increase the cutoff for the **average TF-IDF** score of the concept. This is intuitive: we want X to have meaning in our knowledge base **overall**, but sometimes a quick mention of X in a document that isn't directly focused on X can be useful. If our concept is `databases`, we don't strictly want it to link to posts strictly focused on databases, we're also interested in matches that mention databases on the side. To prevent noise, we allow this type of loose link and enforce instead that the **concept itself is on average not used too liberally — it is statistically important for enough notes.** (`cutoffs[min_avg_ent_tf_idf/min_avg_noun_tf_idf]`)
+- Minimum Linkage: We also check that X is linked to at least a certain threshold of documents in D. (`cutoffs['min_links']`)
 
 ## Display
 

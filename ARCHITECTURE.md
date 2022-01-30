@@ -75,4 +75,4 @@ Let X be the concept we're studying, and D its associated documents after Step 1
 
 ## Display
 
-Espial then renders its insights using Flask and thegreat D3.JS library for the graph.
+Espial then renders its insights using Flask and the D3.JS library for the graph visualization.

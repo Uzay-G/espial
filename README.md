@@ -12,7 +12,7 @@ See [Architecture](/ARCHITECTURE.md) for a more technical overview of Espial's a
  
 ![demo gif](/img/espial.gif)
 
-Espial's current features:
+### Espial's current features:
 
 - **automated graph**: Espial generates a graph of auto-detected concepts and maps how they link to your different documents. This maps both the meaning of your documents into a visual space and allows you to see how those documents relate to each other with a high-level view.
 - **document similarity**: you can query for a given document in your knowledge base and get most related and relevant notes that you could link / relate to it, and through which concepts. This similarity is on a semantic level (on meaning), not on the words used.
@@ -20,15 +20,20 @@ Espial's current features:
 - **transformation of exploration into concrete structure**: when you view the tags and concepts that the program has surfaced, you can pick those you want to become part of your knowledge base’s structure. They can then become tags or even concept notes (a note that describes a concept and links to related notes).
 - **extensive customizability**: Espial can be easily plugged into many different knowledge base software, although it was first built for [Archivy](https://archivy.github.io). Writing plugins and extensions for other tools is simple.
 
-Future Goals / In Progress Features:
+### Future Goals / In Progress Features:
+
+Espial is a nascent project and will be getting many improvements, including:
 
 - commands to compare and integrate two entire knowledge bases
 - an option to download all the articles referenced in the knowledge base as documents
 - enhance the algorithm so that it learns and detects existing hierarchies in your knowledge
 - coordinate launch of Espial plugins for major knowledge base software
+- improve load time for large KBs
+
+If there are things you want added to Espial, [create an issue](https://github.com/Uzay-G/espial/issues)!
 
 ## Installation
-- have Pip and Python installed
+- have pip and Python installed
 - Run `pip install espial`
 - Run `python -m spacy download en_core_web_md`
 

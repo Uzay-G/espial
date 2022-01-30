@@ -5,11 +5,12 @@ import re
 
 
 def most_relevant_tags(mesh, n_tags=30, entities=False):
+    """This method needs work - current heuristics remain flawed."""
     concept_avgs = [
         {"name": concept, "relevance": mesh.graph.nodes[concept]["score"]}
         for concept in mesh.concept_cache.keys()
     ]
-    if entities:
+    if entities:  # only return entities
         concept_avgs = list(
             filter(lambda x: mesh.graph.nodes[x["name"]]["is_ent"], concept_avgs)
         )
@@ -22,23 +23,24 @@ def most_relevant_tags(mesh, n_tags=30, entities=False):
             )
         )
         concept_avgs[i]["in_docs"] = in_docs
-    return concept_avgs[:n_tags]
+    return concept_avgs[: min(n_tags, len(concept_avgs) - 1)]
 
 
 def find_most_sim(mesh, doc_id, top_n=10):
+    """Find documents most similar to the given document."""
     doc = mesh.doc_cache[doc_id]
     results = []
-    in_edges = list(map(lambda x: x[1], mesh.graph.out_edges(doc_id)))
-    for doc2 in mesh.doc_cache.values():
-        if doc2._.id != doc_id:
-            in_edges2 = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
-            inter = [conc for conc in in_edges if conc in in_edges2]
+    doc_conc = list(map(lambda x: x[1], mesh.graph.out_edges(doc_id)))
+    for other_doc in mesh.doc_cache.values():
+        if other_doc._.id != doc_id:
+            other_doc_conc = list(map(lambda x: x[1], mesh.graph.out_edges(other_doc._.id)))
+            inter = [conc for conc in doc_conc if conc in other_doc_conc]
             results.append(
                 {
-                    "id": doc2._.id,
-                    "sim": doc.similarity(doc2),
+                    "id": other_doc._.id,
+                    "sim": doc.similarity(other_doc),
                     "related": inter,
-                    "title": doc2._.title,
+                    "title": other_doc._.title,
                 }
             )
     results.sort(key=lambda x: x["sim"], reverse=True)
@@ -46,6 +48,7 @@ def find_most_sim(mesh, doc_id, top_n=10):
 
 
 def search_q(mesh, q, top_n=10):
+    """Search for given query inside the graph."""
     results = []
     potent_concepts = mesh.get_existing_doc_concepts(q)
     for doc2 in mesh.doc_cache.values():
@@ -60,6 +63,8 @@ def search_q(mesh, q, top_n=10):
             }
         )
     max_inter = 1
+
+    # integrate number of related concepts as a factor of the score - hyperparams need tuning here
     sim_norm = [0, 0]
     for result in results:
         max_inter = max(max_inter, len(result["related"]))
@@ -68,13 +73,14 @@ def search_q(mesh, q, top_n=10):
     for result in results:
         result["sim"] = (result["sim"] - sim_norm[1]) / (
             sim_norm[0] - sim_norm[1]
-        ) * 20 + (len(result["related"]) / max_inter)
+        ) * 18 + (
+            len(result["related"]) / max_inter
+        )  # normalize similarity and add interconnections
     results.sort(key=lambda x: x["sim"], reverse=True)
     return results[: min(len(results) - 1, top_n)]
 
 
 def process_markdown(content):
-
     STOPWORDS = [
         "a",
         "about",
@@ -124,13 +130,13 @@ def process_markdown(content):
         "your",
     ]
     content = " ".join(filter(lambda x: not x in STOPWORDS, content.split()))
-    content = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", content)
+    content = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", content)  # remove links
     return content
 
 
 def load_url(url, nlp):
     """
-    Process url to get content for analysis.
+    Process url to get content for analysis. [WIP feature (see readme)]
     """
     try:
         url_request = requests.get(
@@ -140,7 +146,7 @@ def load_url(url, nlp):
     except Exception:
         return False
     html_doc = Document(url_request.text)
-    content = html2text(html_doc.summary(), bodywidth=0) 
+    content = html2text(html_doc.summary(), bodywidth=0)
     doc = nlp(content)
     doc._.id = url
     doc._.title = html_doc.short_title() or url
@@ -148,6 +154,9 @@ def load_url(url, nlp):
 
 
 def extract_urls(content):
-    URL_REGEX = re.compile('((?:https?):(?:(?://)|(?:\\\\))+(?:[\w\d:#@%/;$~_?\+-=\\\.&](?:#!)?)*)', re.DOTALL)
+    URL_REGEX = re.compile(
+        "((?:https?):(?:(?://)|(?:\\\\))+(?:[\w\d:#@%/;$~_?\+-=\\\.&](?:#!)?)*)",
+        re.DOTALL,
+    )
     urls = re.findall(URL_REGEX, content)
     return urls

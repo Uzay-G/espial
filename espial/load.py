@@ -39,7 +39,6 @@ def load_mesh(config):
     dumped_annot = data_dir / "serialized_annot"
     if dumped_annot.exists():
         with dumped_annot.open("rb") as f:
-
             doc_bin = DocBin(store_user_data=True).from_bytes(f.read())
             deleted_docs = False
             for doc in doc_bin.get_docs(nlp.vocab):
@@ -55,7 +54,7 @@ def load_mesh(config):
                     docs.append(doc)
                 else:
                     deleted_docs = True
-            if deleted_docs:
+            if deleted_docs:  # we need to rerun the analysis
                 rerun = 1
                 doc_bin = DocBin(store_user_data=True)
                 for doc in docs:
@@ -70,7 +69,7 @@ def load_mesh(config):
     unseen_docs = []
     for id, item in items.items():
         item["content"] = process_markdown(item["content"])
-        if not id in doc_cache and len(item["content"]) < 1000000 / 10:
+        if not id in doc_cache and len(item["content"]) < 1000000:
             unseen_docs.append(
                 (
                     item["content"],
@@ -94,9 +93,10 @@ def load_mesh(config):
         else:
             for node in loaded_graph.nodes():
                 if loaded_graph.nodes[node]["type"] == "concept":
-                    mesh.concept_cache[node] = None  # don't load the NLP
+                    mesh.concept_cache[
+                        node
+                    ] = None  # we want to access concepts in concept_cache but don't need the vector emb
             mesh.graph = loaded_graph
-            print("loading graphs")
     else:
         rerun = 1
 
@@ -117,7 +117,9 @@ def load_mesh(config):
         doc._.path = ctx["path"]
         doc._.hash = ctx["hash"]
         doc_bin.add(doc)
-        if ctx["id"] in doc_cache and ctx["id"] in mesh.graph:
+        if (
+            ctx["id"] in doc_cache and ctx["id"] in mesh.graph
+        ):  # update old documents that have changed
             mesh.remove_doc(ctx["id"])
         mesh.process_document(doc)
 

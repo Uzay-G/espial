@@ -1,6 +1,5 @@
 import time
 import json
-import re
 from pathlib import Path
 from espial.config import Config
 
@@ -17,7 +16,7 @@ def create_app(config=Config()):
     CORS(app)
     data_dir = Path(config.data_dir)
     mesh, nlp, rerun = load_mesh(config)
-    b = time.time()
+    trim1 = time.time()
     if rerun:
         print(
             f"{mesh.graph.number_of_edges()} number of doc-concept links before sanitization. {len(mesh.concept_cache)} concepts."
@@ -27,15 +26,13 @@ def create_app(config=Config()):
             mesh.graph.number_of_edges(),
             "number of doc-concept links after tf-idf pre-processing",
         )
-        z = time.time()
-        print(time.time() - z, "merges")
-        c = time.time()
+        trim2 = time.time()
         print(
             f"time spent to remove irrelevant edges: edges [{mesh.graph.number_of_edges()}]",
-            c - b,
+            trim2 - trim1,
         )
         mesh.trim_all()
-        print(time.time() - c, "time spent to remove all uninteresting concepts")
+        print(time.time() - trim2, "time spent to remove all uninteresting concepts")
     print(len(mesh.concept_cache), "number of concepts found")
     print(mesh.graph.number_of_edges(), "number of edges left")
     json_graph = networkx.json_graph.node_link_data(
@@ -43,7 +40,6 @@ def create_app(config=Config()):
     )
     json.dump(json_graph, (data_dir / "graph.json").open("w"))
     json.dump(json_graph, (Path(app.root_path) / "static/force.json").open("w"))
-
     search_q(mesh, nlp("test"))  # prep search server up - makes results faster
 
     @app.route("/")
@@ -72,23 +68,23 @@ def create_app(config=Config()):
     @app.route("/concept/<concept>")
     def view_concept(concept):
         if not concept in mesh.graph or not "score" in mesh.graph.nodes[concept]:
-            return
+            return flask.redirect("/")  # todo, setup flashes
         concept_node = mesh.graph.nodes[concept]
 
-        docs = list(
+        related_docs = list(
             map(
                 lambda x: (x[0], mesh.doc_cache[x[0]]._.title),
                 mesh.graph.in_edges(concept),
             )
         )
         return flask.render_template(
-            "show_concept.html", title=concept, concept=concept_node, docs=docs
+            "show_concept.html", title=concept, concept=concept_node, docs=related_docs
         )
 
     @app.route("/doc/<id>")
     def view_doc(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
-            return
+            return flask.redirect("/")
         tags = list(map(lambda x: x[1], mesh.graph.out_edges(id)))
         most_sim = find_most_sim(mesh, id)
         return flask.render_template(
@@ -100,11 +96,11 @@ def create_app(config=Config()):
         )
 
     @app.route("/semantic_search")
-    def search():
+    def search_endpoint():
         q = request.args.get("q")
         top_n = int(request.args.get("top_n", 10))
         if not q:
-            return
+            return flask.redirect("/")
         res = search_q(mesh, nlp(q), top_n)
         for doc in res:
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
@@ -118,26 +114,27 @@ def create_app(config=Config()):
     def compare_article():
         url = request.args.get("url")
         top_n = int(request.args.get("top_n", 10))
-        ar = newspaper.Article(url)
-        ar.download()
-        ar.parse()
-        hits = search_q(mesh, nlp(ar.text), top_n)
+        article = load_url(url, nlp)
+        hits = search_q(mesh, article, top_n)
         for doc in hits:
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
-        resp = {"hits": hits, "article": {"title": ar.title, "text": ar.text}}
+        resp = {
+            "hits": hits,
+            "article": {"title": article._.title, "text": article.text},
+        }
         return jsonify(resp)
 
     @app.route("/create_tag/<concept>")
     def make_tag(concept):
         if not concept in mesh.concept_cache:
-            return
+            return flask.redirect("/")
         config.create_tag(concept, mesh)
         return "Success", 200
 
     @app.route("/create_concept_note/<concept>")
     def concept_note(concept):
         if not concept in mesh.concept_cache:
-            return
+            return flask.redirect("/")
         config.create_concept_note(concept, mesh)
         return "Success", 200
 
@@ -145,7 +142,7 @@ def create_app(config=Config()):
     def misc_page():
         return flask.render_template("misc.html", title="Misc")
 
-    #with open("dbg_pain", "w") as f:
+    # with open("dbg_pain", "w") as f:
     #    f.write(mesh.dbg)
 
     @app.route("/create_all_concept_notes")

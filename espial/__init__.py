@@ -160,4 +160,11 @@ def create_app(config=Config()):
             config.create_concept_note(concept, mesh)
         flask.flash("All concept notes created", "success")
         return flask.redirect("/misc")
+
+    @app.route("/create_all_tags")
+    def create_all_tags():
+        for concept in mesh.concept_cache:
+            config.create_tag(concept, mesh)
+        flask.flash("All tags created", "success")
+        return flask.redirect("/misc")
     return app

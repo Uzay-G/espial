@@ -49,9 +49,8 @@ class Config(object):
         """
         for doc, concept, data in mesh.graph.in_edges(concept, data=True):
             path = Path(mesh.graph.nodes[doc]["path"])
-            matching_occurs = data[
-                "orig"
-            ]  # edge['orig'] stores the words in the original text that caused the link
+            # edge['orig'] stores the words in the original text that caused the link
+            matching_occurs = [re.escape(x) for x in data["orig"]]
             tag_re = re.compile(
                 rf"(^|\n| )({'|'.join(matching_occurs)})($|\n| )", re.IGNORECASE
             )  # for each word that lead to the concept, replace it with #concept

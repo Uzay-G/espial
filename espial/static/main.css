@@ -65,6 +65,12 @@ body, html, svg {
 	background-color: #dcffe4;
 	border-color: rgba(23,111,44,0.2);
 }
+.bold-btn {
+	border: 1px solid var(--color-bg-secondary);
+	border-radius: var(--border-radius);
+	margin-bottom: 1rem;
+	padding: 0.4rem 0.8rem;
+}
 // force
 .link {
   stroke: #ccc;
@@ -103,3 +109,6 @@ body, html, svg {
 	left: 1em;
 }
 
+#sem-search input, #sem-search button, #web-search input, #web-search button {
+	margin: 5px;
+}

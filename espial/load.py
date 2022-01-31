@@ -32,11 +32,11 @@ def load_mesh(config):
         }
         item["hash"] = hash_fn(item)
         items[config.get_item_id(item)] = item
-    saved_graph = data_dir / "graph.json"
+    saved_graph = data_dir / ".graph.json"
     doc_cache = {}
     a = time.time()
     docs = []
-    dumped_annot = data_dir / "serialized_annot"
+    dumped_annot = data_dir / ".doc_annotations"
     if dumped_annot.exists():
         with dumped_annot.open("rb") as f:
             doc_bin = DocBin(store_user_data=True).from_bytes(f.read())

@@ -15,7 +15,6 @@ def espial():
 @click.option("--rerun", help="Regenerate existing concept graph", is_flag=True)
 @click.option("--port", type=int, help="Port to run server on.", default=None)
 @click.option("--host", type=str, help="Host to run server on.", default=None)
-# @click.option("--build", type=bool, help="If enabled will build the concept graph as a static website")
 def run(data_dir, rerun, port, host):
     data_dir = Path(data_dir)
     if not data_dir.exists():

@@ -2,6 +2,7 @@ import time
 import json
 from pathlib import Path
 from espial.config import Config
+from os import urandom
 
 import flask
 from flask_cors import CORS
@@ -13,6 +14,7 @@ from espial.analysis import *
 
 def create_app(config=Config()):
     app = flask.Flask(__name__)
+    app.secret_key = urandom(24)
     CORS(app)
     data_dir = Path(config.data_dir)
     mesh, nlp, rerun = load_mesh(config)
@@ -55,7 +57,8 @@ def create_app(config=Config()):
     @app.route("/most_sim/<id>")
     def find_sim(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
-            return
+            flask.flash("Document not found", "error")
+            return flask.redirect_to("/")
         top_n = request.args.get("top_n", 10)
         return jsonify(find_most_sim(mesh, id, top_n))
 
@@ -68,6 +71,7 @@ def create_app(config=Config()):
     @app.route("/concept/<concept>")
     def view_concept(concept):
         if not concept in mesh.graph or not "score" in mesh.graph.nodes[concept]:
+            flask.flash("Concept not found", "error")
             return flask.redirect("/")  # todo, setup flashes
         concept_node = mesh.graph.nodes[concept]
 
@@ -84,6 +88,7 @@ def create_app(config=Config()):
     @app.route("/doc/<id>")
     def view_doc(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
+            flask.flash("Document not found", "error")
             return flask.redirect("/")
         tags = list(map(lambda x: x[1], mesh.graph.out_edges(id)))
         most_sim = find_most_sim(mesh, id)
@@ -127,16 +132,20 @@ def create_app(config=Config()):
     @app.route("/create_tag/<concept>")
     def make_tag(concept):
         if not concept in mesh.concept_cache:
+            flask.flash("Concept not found", "error")
             return flask.redirect("/")
         config.create_tag(concept, mesh)
-        return "Success", 200
+        flask.flash("Tag created", "success")
+        return flask.redirect(f"/concept/{concept}")
 
     @app.route("/create_concept_note/<concept>")
     def concept_note(concept):
         if not concept in mesh.concept_cache:
+            flask.flash("Concept not found", "error")
             return flask.redirect("/")
         config.create_concept_note(concept, mesh)
-        return "Success", 200
+        flask.flash("Concept note created", "success")
+        return flask.redirect(f"/concept/{concept}")
 
     @app.route("/misc")
     def misc_page():
@@ -149,6 +158,6 @@ def create_app(config=Config()):
     def create_all_concept_notes():
         for concept in mesh.concept_cache:
             config.create_concept_note(concept, mesh)
-        return "Success", 200
-
+        flask.flash("All concept notes created", "success")
+        return flask.redirect("/misc")
     return app

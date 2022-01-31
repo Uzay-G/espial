@@ -44,13 +44,10 @@ def create_app(config=Config()):
 
     @app.route("/")
     def index():
+        search_keys = [(k, k) for k in mesh.concept_cache.keys()] + [(doc._.title, k) for k, doc in mesh.doc_cache.items()]
         return flask.render_template(
-            "index.html", title="Graph", n_nodes=len(mesh.graph.nodes)
+            "index.html", title="Graph", n_nodes=len(mesh.graph.nodes), items=search_keys
         )
-
-    @app.route("/graph")
-    def concept_graph():
-        return flask.render_template("force.html", n_nodes=len(mesh.graph.nodes))
 
     @app.route("/most_sim/<id>")
     def find_sim(id):

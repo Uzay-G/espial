@@ -2,46 +2,19 @@
 
 {% block content %}
     <button id="fit-button" onclick="zoomFit()">Re-Center</button>
+	<form id="finder_form" style="position: absolute; bottom: 1em; right: 1em">
+		<input list="finder" id="finder_input" required />
+		<datalist id="finder" >
+		  {% for item, id in items %}
+			<option value="{{ item }}" data-id="{{ id }}">
+		  {% endfor %}
+		</datalist>
+	</form>
+	     
     <script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
 <style>
 	body {
 		background: #2C2E43;
-	}
-	.link {
-	  stroke: #ccc;
-	}
-
-	.node text {
-	  pointer-events: none;
-	  font: 10px sans-serif;
-	}
-
-	.link {
-	  stroke: #777;
-	  stroke-opacity: 0.3;
-	  stroke-width: 1.5px;
-	}
-
-	.node text {
-	  display: none;
-	  font: 20px sans-serif;
-	  z-index: 99;
-	  color: #DF5E5E;
-	}
-
-
-	.node:hover text {
-	  display: inline;
-	}
-
-	.cell {
-	  fill: none;
-	  pointer-events: all;
-	}
-	#fit-button {
-		position: absolute;
-		bottom: 1em;
-		left: 1em;
 	}
 </style>
 

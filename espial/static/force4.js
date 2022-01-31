@@ -6,10 +6,10 @@ function zoomed() {
 let handle_tag_click = function(d) {
   console.log(d.id)
   if (!d.title) {
-	window.open(`http://localhost:5002/concept/${d.id}`, '_blank')
+	window.open(`/concept/${d.id}`, '_blank')
   }
   else {
-	window.open(`http://localhost:5002/doc/${d.id}`, '_blank')
+	window.open(`/doc/${d.id}`, '_blank')
   }
 }
 
@@ -45,7 +45,8 @@ var color = d3.scaleOrdinal(d3.schemeBlues)
       .attr("class", "nodes")
     .selectAll("g")
     .data(graph.nodes)
-    .enter().append("g").attr("class", "node").on("click", d => handle_tag_click(d));
+    .enter().append("g").attr("id", d => d.id).attr("class", "node").on("click", d => handle_tag_click(d));
+	
   
   var circles = node.append("circle")
       .attr("r", 10)
@@ -149,7 +150,6 @@ function zoomFit(initial) {
     scale = scale / Math.max(width / fullWidth, height / fullHeight);
     var translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
 
-    console.trace("zoomFit", translate, scale);
 	svg
 	  .transition()
 	  .duration(0) // milliseconds
@@ -157,4 +157,26 @@ function zoomFit(initial) {
 	  	.translate(translate[0], translate[1])
 	  	.scale(scale)
 	  );
+}
+let finderForm = document.getElementById("finder_form");
+finderForm.onsubmit = function(e) {
+	e.preventDefault();
+	let id = document.getElementById("finder_input").value;
+	let node = root.select("#" + id);
+	node.select("text").style("display", "inline");
+    var bbox = node.node().getBBox(),
+       bounds = [[bbox.x, bbox.y],[bbox.x + bbox.width, bbox.y + bbox.height]];
+
+	let transform = node.attr("transform").replace("translate(", "").replace(")", "").split(",");
+    var dx = bounds[1][0] - bounds[0][0],
+      dy = bounds[1][1] - bounds[0][1],
+      x = (bounds[0][0] + bounds[1][0]) / 2 + parseFloat(transform[0]),
+      y = (bounds[0][1] + bounds[1][1]) / 2 + parseFloat(transform[1]),
+      scale = Math.max(1, Math.min(8, 0.3 / Math.max(dx / width, dy / height))),
+      translate = [width / 2 - scale * x + 500, height / 2 - scale * y + 150];
+
+	console.log(translate)
+	  svg.transition()
+		  .duration(750)
+		  .call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale))
 }

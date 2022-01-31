@@ -1,3 +1,5 @@
+![logo](/img/logo.png)
+
 Espial is **an engine for automated organization and discovery in knowledge bases**. It can be adapted to run with any knowledge base software, but currently works best with any type of file-based knowledge bases.
 
 Espial uses Natural Language Processing and AI to improve the way you find new links in your knowledge, enhancing the organization of your thoughts to help you discover new ones.

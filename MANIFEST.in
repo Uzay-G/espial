@@ -1,0 +1,4 @@
+include README.md
+include requirements.txt
+recursive-include espial/static *
+recursive-include espial/templates *

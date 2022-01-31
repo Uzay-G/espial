@@ -1,6 +1,6 @@
 ![logo](/espial/static/logo.svg)
 
-Espial is **an engine for automated organization and discovery in knowledge bases**. It can be adapted to run with any knowledge base software, but currently works best with any type of file-based knowledge bases.
+Espial is **an engine for automated organization and discovery in knowledge bases**. It can be adapted to run with any knowledge base software, but currently works best with file-based knowledge bases.
 
 Espial uses Natural Language Processing and AI to improve the way you find new links in your knowledge, enhancing the organization of your thoughts to help you discover new ones.
 
@@ -53,31 +53,7 @@ Options:
 
 ## Configuration
 
-Espial's configuration language is Python. See [espial/config.py](/espial/config.py) to see what you can configure. Create a new `espial.py` file in your data directory, with the following base template:
-
-```python
-from espial.config import Config
-
-class Config(Config):
-    def __init__(self):
-        super().__init__()
-```
-
-For example:
-
-```python
-from espial.config import Config
-
-class Config(Config):
-    def __init__(self):
-        super().__init__()
-		self.PORT = <> # redefine attributes
-		self.host = <>
-	
-	# redefine a function
-	def get_item_id(self, item):
-		<>
-```
+Espial's configuration language is Python. See [espial/config.py](/espial/config.py) to see what you can configure. Run `espial config <data-dir>` to set up your configuration.
 
 If you like the software, consider [sponsoring me](https://github.com/Uzay-G/espial). I'm a student and the support is really useful. If you use it in your own projects, please credit the original library.
 

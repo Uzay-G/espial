@@ -49,3 +49,41 @@ body, html, svg {
 			width: 100%;
 			height: 100%;
 		}
+
+// force
+.link {
+  stroke: #ccc;
+}
+
+.node text {
+  pointer-events: none;
+  font: 10px sans-serif;
+}
+
+.link {
+  stroke: #777;
+  stroke-opacity: 0.3;
+  stroke-width: 1.5px;
+}
+
+.node text {
+  display: none;
+  font: 20px sans-serif;
+  z-index: 99;
+  color: #DF5E5E;
+}
+
+
+.node:hover text {
+  display: inline;
+}
+
+.cell {
+  fill: none;
+  pointer-events: all;
+}
+#fit-button {
+	position: absolute;
+	bottom: 1em;
+	left: 1em;
+}

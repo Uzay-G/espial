@@ -9,16 +9,17 @@ with open('requirements.txt', encoding='utf-8') as f:
 
 setup(
     name='espial',
-    version='0.1.0',
+    version='0.1.0rc2',
     author="Uzay-G",
     author_email="halcyon@disroot.org",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
+    #long_description=long_description,
+    #long_description_content_type="text/markdown",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License"
     ],
     packages=find_packages(),
     install_requires=install_requires,
+    include_package_data=True,
     entry_points={"console_scripts": ["espial=espial.cli:espial"]}
 )

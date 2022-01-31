@@ -1,4 +1,4 @@
-![logo](/img/logo.png)
+![logo](/espial/static/logo.svg)
 
 Espial is **an engine for automated organization and discovery in knowledge bases**. It can be adapted to run with any knowledge base software, but currently works best with any type of file-based knowledge bases.
 

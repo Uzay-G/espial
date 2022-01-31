@@ -49,7 +49,7 @@ Options:
   --host TEXT     Host to run server on.
   --help          Show this message and exit.
 ```
-- run `espial run <the directory with your files>` and then open http://localhost:5002 to access the interface.
+- run `espial run <the directory with your files>` and then open http://localhost:5002 to access the interface. **Warning: if you're running Espial on a low-ram device, lower `batch_size` in the config (see below).**
 
 ## Configuration
 

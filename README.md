@@ -61,3 +61,4 @@ If you like the software, consider [sponsoring me](https://github.com/Uzay-G/esp
 
 If you have ideas for the project and how to make it better, please open an issue or contact me.
 
+If you have any more casual questions you can also message me [here](https://discord.gg/uQsqyxB).

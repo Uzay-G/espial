@@ -15,7 +15,7 @@ from espial.analysis import *
 def create_app(config=Config()):
     app = flask.Flask(__name__)
     app.secret_key = urandom(24)
-    CORS(app)
+    CORS(app, origins=config.ALLOWED_ORIGINS)
     data_dir = Path(config.data_dir)
     mesh, nlp, rerun = load_mesh(config)
     trim1 = time.time()
@@ -58,7 +58,7 @@ def create_app(config=Config()):
     def find_sim(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
             flask.flash("Document not found", "error")
-            return flask.redirect_to("/")
+            return flask.redirect(flask.url_for('index'))
         top_n = request.args.get("top_n", 10)
         return jsonify(find_most_sim(mesh, id, top_n))
 
@@ -72,7 +72,7 @@ def create_app(config=Config()):
     def view_concept(concept):
         if not concept in mesh.graph or not "score" in mesh.graph.nodes[concept]:
             flask.flash("Concept not found", "error")
-            return flask.redirect("/")  # todo, setup flashes
+            return flask.redirect(flask.url_for('index'))
         concept_node = mesh.graph.nodes[concept]
 
         related_docs = list(
@@ -89,7 +89,7 @@ def create_app(config=Config()):
     def view_doc(id):
         if not id in mesh.graph or "score" in mesh.graph.nodes[id]:
             flask.flash("Document not found", "error")
-            return flask.redirect("/")
+            return flask.redirect(flask.url_for('index'))
         tags = list(map(lambda x: x[1], mesh.graph.out_edges(id)))
         most_sim = find_most_sim(mesh, id)
         return flask.render_template(
@@ -100,12 +100,12 @@ def create_app(config=Config()):
             most_sim=most_sim,
         )
 
-    @app.route("/semantic_search")
+    @app.route("/semantic_search", methods=["POST"])
     def search_endpoint():
-        q = request.args.get("q")
-        top_n = int(request.args.get("top_n", 10))
+        q = request.json.get("q")
+        top_n = int(request.json.get("top_n", 10))
         if not q:
-            return flask.redirect("/")
+            return flask.redirect(flask.url_for('index'))
         res = search_q(mesh, nlp(q), top_n)
         for doc in res:
             doc["link"] = config.get_link(mesh.doc_cache[doc["id"]])
@@ -133,19 +133,19 @@ def create_app(config=Config()):
     def make_tag(concept):
         if not concept in mesh.concept_cache:
             flask.flash("Concept not found", "error")
-            return flask.redirect("/")
+            return flask.redirect(flask.url_for('index'))
         config.create_tag(concept, mesh)
         flask.flash("Tag created", "success")
-        return flask.redirect(f"/concept/{concept}")
+        return flask.redirect(flask.url_for('view_concept', concept=concept))
 
     @app.route("/create_concept_note/<concept>")
     def concept_note(concept):
         if not concept in mesh.concept_cache:
             flask.flash("Concept not found", "error")
-            return flask.redirect("/")
+            return flask.redirect(flask.url_for('index'))
         config.create_concept_note(concept, mesh)
         flask.flash("Concept note created", "success")
-        return flask.redirect(f"/concept/{concept}")
+        return flask.redirect(flask.url_for('view_concept', concept=concept))
 
     @app.route("/misc")
     def misc_page():
@@ -159,12 +159,19 @@ def create_app(config=Config()):
         for concept in mesh.concept_cache:
             config.create_concept_note(concept, mesh)
         flask.flash("All concept notes created", "success")
-        return flask.redirect("/misc")
+        return flask.redirect(flask.url_for('misc_page'))
 
     @app.route("/create_all_tags")
     def create_all_tags():
         for concept in mesh.concept_cache:
             config.create_tag(concept, mesh)
         flask.flash("All tags created", "success")
-        return flask.redirect("/misc")
+        return flask.redirect(flask.url_for('misc_page'))
+
+    @app.route("/potential_concepts", methods=["POST"])
+    def get_potential_concepts():
+        text = request.json.get("text")
+        if not text:
+            return jsonify([])
+        return jsonify(list(mesh.get_existing_doc_concepts(nlp(text))))
     return app

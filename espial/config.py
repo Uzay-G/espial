@@ -26,6 +26,7 @@ class Config(object):
         self.port = 5002  # port to run Espial on
         self.host = "127.0.0.1"
         self.IGNORE = []  # sub-directories to ignore when crawling
+        self.ALLOWED_ORIGINS = []  # websites allowed to fetch data from Espial
 
     def get_item_id(self, item):
         """

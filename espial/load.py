@@ -50,6 +50,7 @@ def load_mesh(config):
                     doc._.id in items
                     and doc._.hash == items[doc._.id]["hash"]
                     and not excluded_path
+                    and Path(doc._.path).exists()
                 ):
                     docs.append(doc)
                 else:

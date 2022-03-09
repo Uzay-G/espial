@@ -54,30 +54,34 @@ def search_q(mesh, q, top_n=10):
     for doc2 in mesh.doc_cache.values():
         doc_concepts = list(map(lambda x: x[1], mesh.graph.out_edges(doc2._.id)))
         inter = [conc for conc in doc_concepts if conc in potent_concepts]
-        results.append(
-            {
-                "id": doc2._.id,
-                "sim": q.similarity(doc2),
-                "related": inter,
-                "title": doc2._.title,
-            }
-        )
+        sim = doc2.similarity(q)
+        if sim:
+            results.append(
+                {
+                    "id": doc2._.id,
+                    "sim": q.similarity(doc2),
+                    "related": inter,
+                    "title": doc2._.title,
+                }
+            )
     max_inter = 1
 
-    # integrate number of related concepts as a factor of the score - hyperparams need tuning here
-    sim_norm = [0, 0]
-    for result in results:
-        max_inter = max(max_inter, len(result["related"]))
-        sim_norm[0] = max(sim_norm[0], result["sim"])
-        sim_norm[1] = min(sim_norm[1], result["sim"])
-    for result in results:
-        result["sim"] = (result["sim"] - sim_norm[1]) / (
-            sim_norm[0] - sim_norm[1]
-        ) * 18 + (
-            len(result["related"]) / max_inter
-        )  # normalize similarity and add interconnections
-    results.sort(key=lambda x: x["sim"], reverse=True)
-    return results[: min(len(results) - 1, top_n)]
+    if results:
+        # integrate number of related concepts as a factor of the score - hyperparams need tuning here
+        sim_norm = [0, 0]
+        for result in results:
+            max_inter = max(max_inter, len(result["related"]))
+            sim_norm[0] = max(sim_norm[0], result["sim"])
+            sim_norm[1] = min(sim_norm[1], result["sim"])
+        for result in results:
+            result["sim"] = (result["sim"] - sim_norm[1]) / (
+                sim_norm[0] - sim_norm[1]
+            ) * 18 + (
+                len(result["related"]) / max_inter
+            )  # normalize similarity and add interconnections
+        results.sort(key=lambda x: x["sim"], reverse=True)
+        return results[: min(len(results) - 1, top_n)]
+    return []
 
 
 def process_markdown(content):

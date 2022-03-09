@@ -22,12 +22,6 @@ class ConceptMesh:
         self.conf = conf
         self.sim_cache = {}  # 2D graph of sim
 
-        self.avg_exp_o = 0
-        self.tf_exp_o = 0
-        if conf["openness"]:
-            self.avg_exp_o = 0.04 * -conf["openness"]
-            self.tf_exp_o = 0.001 * -conf["openness"]
-
     def create_link(self, item, concept, is_ent=False):
         """
         Creates link in the graph between an item and a concept
@@ -89,7 +83,7 @@ class ConceptMesh:
                 is_ent = self.graph.nodes[concept]["is_ent"]
                 remove_crit = (
                     tf_idf
-                    < self.conf["cutoffs"]["min_edge_noun_tf_idf"] + self.tf_exp_o
+                    < self.conf["cutoffs"]["min_edge_noun_tf_idf"]
                     and not is_ent
                 ) or (tf_idf < self.conf["cutoffs"]["min_edge_ent_tf_idf"] and is_ent)
                 has_vector = self.concept_cache[concept].has_vector

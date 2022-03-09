@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-	<div class="content">
-		<h1>{{ title }}</h1>
-		<h2>Associated documents</h2>
-		<ul>
-			{% for id, title in docs %}
-				<li><a href="/doc/{{ id }}">{{ title }}</a>
-			{% endfor %}
-		</ul>
-		<a href="/create_tag/{{ title }}">Create tag</a>
-	</div>
+  <div class="content">
+    <h1>{{ title }}</h1>
+    <h2>Associated documents</h2>
+    <ul>
+      {% for id, title in docs %}
+		<li><a href="{{ url_for('view_doc', id=id) }}">{{ title }}</a>
+      {% endfor %}
+    </ul>
+	<a href="{{ url_for('make_tag', concept=title) }}">Create tag</a>
+  </div>
 {% endblock %}

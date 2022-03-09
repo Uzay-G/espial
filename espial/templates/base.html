@@ -1,33 +1,33 @@
 <html>
-    <head>
-      <title>{{ title }} - Espial</title>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
-    </head>
-	<body>
-		<div class="nav">
-			<div class="nav-links">
-				<a href="/" class="home-link">
-					<img src="/static/logo.svg">
-					Espial
-				</a>
-				<a href="/search">
-					Search
-				</a>
-				<a href="/misc">
-					Misc
-				</a>
-			</div>
-		</div>
-		{% with messages = get_flashed_messages(with_categories=True) %}
-			{% if messages %}
-				{% for category, message in messages %}
-					<div class="flash mt-3 mb-3 flash-{{ category }}">{{ message }}</div>
-				{% endfor %}
-			{% endif %}
-		{% endwith %}
-		{% block content %}{% endblock %}
-	</body>
+  <head>
+    <title>{{ title }} - Espial</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+  </head>
+  <body>
+    <div class="nav">
+      <div class="nav-links">
+        <a href="/" class="home-link">
+		  <img src="{{ url_for('static', filename='logo.svg') }}">
+          Espial
+        </a>
+		<a href="{{ url_for('search_view') }}">
+          Search
+        </a>
+		<a href="{{ url_for('misc_page') }}">
+          Misc
+        </a>
+      </div>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash mt-3 mb-3 flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </body>
 </html>

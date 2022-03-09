@@ -2,13 +2,13 @@
 
 {% block content %}
     <div class="content">
-		<h1>Miscellaneous tools and utilities</h2>
-		<h2 class="bold-btn"><a href="/create_all_concept_notes">Create all concept notes</a></h2>
-		<p>Concept notes are notes that list every document associated with a given concept, allowing Espial's structure to become integrated with your personal KB.</p>
+    <h1>Miscellaneous tools and utilities</h2>
+	<h2 class="bold-btn"><a href="{{ url_for('create_all_concept_notes') }}">Create all concept notes</a></h2>
+    <p>Concept notes are notes that list every document associated with a given concept, allowing Espial's structure to become integrated with your personal KB.</p>
 
 
-		<h2 class="bold-btn"><a href="/create_all_tags">Create all tags</a></h2>
-		<p>Clicking the button above will integrate each detected tag into your knowledge base. By default this means it replaces occurences of the concept in your notes by <code>#concept</code>, but this is configurable.</p>
-		<p>Coming soon on this page: rankings of concepts and documents based on their relevance</p>
-	</div>
+	<h2 class="bold-btn"><a href="{{ url_for('create_all_tags') }}">Create all tags</a></h2>
+    <p>Clicking the button above will integrate each detected tag into your knowledge base. By default this means it replaces occurences of the concept in your notes by <code>#concept</code>, but this is configurable.</p>
+    <p>Coming soon on this page: rankings of concepts and documents based on their relevance</p>
+  </div>
 {% endblock %}

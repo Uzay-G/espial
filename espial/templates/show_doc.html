@@ -1,19 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-	<div class="content">
-		<h1>{{ doc._.title }}</h1>
-		{% for c in tags %}
-			<a href="/concept/{{ c }}" class="tags">{{ c }}</a>
-		{% endfor %}
-		<h2>Most similar documents</h2>
-		<ul>
-			{% for match in most_sim %}
-				<li><a href="/doc/{{ match.id }}">{{ match.title }}</a>
-				{% for c in match.related %}
-					<a href="/concept/{{ c }}" class="tags">{{ c }}</a>
-				{% endfor %}
-			{% endfor %}
-		</ul>
-		
-	</div>
+  <div class="content">
+    <h1>{{ doc._.title }}</h1>
+    {% for c in tags %}
+	  <a href="{{ url_for('view_concept', concept=c) }}" class="tags">{{ c }}</a>
+    {% endfor %}
+    <h2>Most similar documents</h2>
+    <ul>
+      {% for match in most_sim %}
+	  <li><a href="{{ url_for('view_doc', id=match.id) }}">{{ match.title }}</a>
+        {% for c in match.related %}
+          <a href="{{ url_for('view_concept', concept=c) }}" class="tags">{{ c }}</a>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
 {% endblock %}

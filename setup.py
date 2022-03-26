@@ -9,7 +9,7 @@ with open('requirements.txt', encoding='utf-8') as f:
 
 setup(
     name='espial',
-    version='0.2.1',
+    version='0.2.2',
     author="Uzay-G",
     author_email="halcyon@disroot.org",
     #long_description=long_description,

@@ -31,7 +31,7 @@
       hits.innerHTML = "";
       if (search !== "")
       {
-		let req = await fetch(`{{ url_for('search_endpoint') }}`, {
+        let req = await fetch(`{{ url_for('search_endpoint') }}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -44,11 +44,11 @@
         let results = await req.json();
         results.forEach((hit) => {
           let li = document.createElement("li"), a = document.createElement("a");
-          a.href = `/doc/${hit.id}`, a.textContent = hit.title;
+          a.href = `{{ url_for('view_doc', id='') }}${hit.id}`, a.textContent = hit.title;
           li.appendChild(a);
           hit.related.forEach((concept) => {
             let concept_link = document.createElement("a");
-            concept_link.href = `/concept/${concept}`, concept_link.textContent = concept;
+            concept_link.href = `{{ url_for('view_concept', concept='') }}${concept}`, concept_link.textContent = concept;
             concept_link.classList.add("tags");
             li.appendChild(concept_link);
           })
@@ -69,18 +69,18 @@
       hits.innerHTML = "";
       if (search !== "")
       {
-		let req = await fetch(`{{ url_for('compare_article') }}?url=${encodeURIComponent(search)}&top_n=20`);
+        let req = await fetch(`{{ url_for('compare_article') }}?url=${encodeURIComponent(search)}&top_n=20`);
         let results = await req.json();
         let h3 = document.createElement("h3");
         h3.textContent = `Search results for "${results.article.title}"`
         hits.appendChild(h3);
         results.hits.forEach((hit) => {
           let li = document.createElement("li"), a = document.createElement("a");
-          a.href = hit.id, a.textContent = hit.title;
+          a.href = `{{ url_for('view_doc', id='') }}${hit.id}`, a.textContent = hit.title;
           li.appendChild(a);
           hit.related.forEach((concept) => {
             let concept_link = document.createElement("a");
-            concept_link.href = `/concept/${concept}`, concept_link.textContent = concept;
+            concept_link.href = `{{ url_for('view_concept', concept='') }}${concept}`, concept_link.textContent = concept;
             concept_link.classList.add("tags");
             li.appendChild(concept_link);
           })

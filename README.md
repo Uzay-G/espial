@@ -1,6 +1,6 @@
 ![logo](/espial/static/logo.svg)
 
-[Live Demo (read-only)](http://espial.uzpg.me)
+[Live Demo (read-only)](http://espial.uzpg.me:4000)
 
 Espial is **an engine for automated organization and discovery in knowledge bases**. It can be adapted to run with any knowledge base software, but currently works best with file-based knowledge bases.
 

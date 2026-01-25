@@ -3,6 +3,56 @@ from readability import Document
 import requests
 import re
 
+# Stopwords defined at module level as a frozenset for O(1) lookup
+_STOPWORDS = frozenset([
+    "a",
+    "about",
+    "an",
+    "are",
+    "and",
+    "as",
+    "at",
+    "be",
+    "but",
+    "by",
+    "com",
+    "do",
+    "don't",
+    "for",
+    "from",
+    "has",
+    "have",
+    "he",
+    "his",
+    "i",
+    "i'm",
+    "in",
+    "is",
+    "it",
+    "it's",
+    "just",
+    "like",
+    "me",
+    "my",
+    "not",
+    "of",
+    "on",
+    "or",
+    "so",
+    "t",
+    "that",
+    "the",
+    "they",
+    "this",
+    "to",
+    "was",
+    "we",
+    "were",
+    "with",
+    "you",
+    "your",
+])
+
 
 def most_relevant_tags(mesh, n_tags=30, entities=False):
     """This method needs work - current heuristics remain flawed."""
@@ -85,55 +135,7 @@ def search_q(mesh, q, top_n=10):
 
 
 def process_markdown(content):
-    STOPWORDS = [
-        "a",
-        "about",
-        "an",
-        "are",
-        "and",
-        "as",
-        "at",
-        "be",
-        "but",
-        "by",
-        "com",
-        "do",
-        "don't",
-        "for",
-        "from",
-        "has",
-        "have",
-        "he",
-        "his",
-        "i",
-        "i'm",
-        "in",
-        "is",
-        "it",
-        "it's",
-        "just",
-        "like",
-        "me",
-        "my",
-        "not",
-        "of",
-        "on",
-        "or",
-        "so",
-        "t",
-        "that",
-        "the",
-        "they",
-        "this",
-        "to",
-        "was",
-        "we",
-        "were",
-        "with",
-        "you",
-        "your",
-    ]
-    content = " ".join(filter(lambda x: not x in STOPWORDS, content.split()))
+    content = " ".join(filter(lambda x: x not in _STOPWORDS, content.split()))
     content = re.sub(r"\[([^\]]*)\]\(http[^)]+\)", r"\1", content)  # remove links
     return content
 
